@@ -29,7 +29,6 @@ int main(int argc, char **argv)
 	{
 		free(command);
 
-		type_prompt();
 		read_command(&command, parameters);
 
 		if (internal_commands(command, parameters))
@@ -78,7 +77,7 @@ bool internal_commands(char *command, char **parameters)
 	{
 		if (parameters[1] != NULL)
             /*Nova função de mkdir no sistema de arquivos simulado*/
-			func_mkdir(parameters[1]);
+			
 		return true;
 	}
     if (strcmp(command, "rmdir") == 0)
