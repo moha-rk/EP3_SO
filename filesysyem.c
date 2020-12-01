@@ -7,6 +7,8 @@
 #define TAMANHO_BLOCO 4000
 #define BLOCOS_FAT 32
 #define BLOCOS_BITMAP 7
+//Tamanho das entradas na FAT
+#define FAT_ENTRY 5
 //Macros do Bitmap (Talvez tenha que inverter, não lembro o que o daniel disse que preferia)
 #define LIVRE '1'
 #define OCUPADO '0'
@@ -17,7 +19,9 @@ char bitmap[N_BLOCOS];
 
 FILE *mount (char *nome_arquivo);
 void cria_FAT(FILE *f);
-void cria_BitMap(FILE *f);
+void carrega_FAT(FILE *f);
+void cria_bitmap(FILE *f);
+void carrega_bitmap(FILE *f);
 
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset);
 
@@ -34,6 +38,10 @@ FILE *mount(char *nome_arquivo)
 
     if (f = fopen(nome_arquivo, "r+"))
     {
+        /*Carregar FAT e bitmap na memória nas váriaveis correspondentes*/
+        carrega_FAT(f);
+        carrega_bitmap(f);
+        //fclose(f);
         return f;
     }
     /*Cria sistema de arquivos com esse nome*/
@@ -44,10 +52,11 @@ FILE *mount(char *nome_arquivo)
     }
     printf("criou arquivo");
     cria_FAT(f);
-    cria_BitMap(f);
-    fclose(f);
+    cria_bitmap(f);
+    //fclose(f);
+    /*Criar '/' e preencher resto dos blocos como vazios*/
     
-    return NULL;
+    return f;
     
     
 }
@@ -60,18 +69,32 @@ void cria_FAT(FILE *f)
     for (i = 0; i < BLOCOS_FAT-1; i++) FAT[i] = i+1;
     FAT[i] = -1;
     //Proximos 7 blocos pertencem ao bitmap
-    for (i = 32; i < 32+BLOCOS_BITMAP-1; i++) FAT[i] = i+1;
+    for (i = 32; i < BLOCOS_FAT+BLOCOS_BITMAP-1; i++) FAT[i] = i+1;
     FAT[i] = -1;
-    //Primeiro bloco pertence ao /
+    //Primeiro bloco pertence ao '/'
     FAT[i+1] = -1;
     //Depois vejo se preciso zerar o resto dos elementos
 
     //Devo escrever no arquivo já aqui?
     for (i = 0; i < N_BLOCOS; i++) fprintf(f, "%05d", FAT[i]);
-    preenche_bloco_vazio(f, BLOCOS_FAT-1, (N_BLOCOS*5)%TAMANHO_BLOCO);
+    preenche_bloco_vazio(f, BLOCOS_FAT-1, (N_BLOCOS*FAT_ENTRY)%TAMANHO_BLOCO);
 }
 
-void cria_BitMap(FILE *f)
+//Recebe um arquivo vazio e carrega a FAT escrita nele
+void carrega_FAT(FILE *f)
+{
+    fseek(f, 0, SEEK_SET);
+    char buf[6];
+    for (int i = 0; i < N_BLOCOS; i++)
+    {
+        fgets(buf, FAT_ENTRY+1, f);
+        FAT[i] = atoi(buf);
+    }
+    //for (int i = 0; i < 50; i++) printf("FAT[%d] = %d\n", i, FAT[i]);
+}
+
+//Recebe um arquivo contendo apenas FAT e escreve o bitmap nele, também o armazenando na memória
+void cria_bitmap(FILE *f)
 {
     //BLOCOS_FAT+BLOCOS_BITMAP+1 engloba blocos destas duas estruturas + bloco inicial do '/'
     int i;
@@ -86,6 +109,19 @@ void cria_BitMap(FILE *f)
         fputc(LIVRE, f);
     }
     preenche_bloco_vazio(f, BLOCOS_FAT+BLOCOS_BITMAP-1, N_BLOCOS%TAMANHO_BLOCO);
+}
+
+//Recebe um arquivo vazio e carrega o bitmap escrita nele
+void carrega_bitmap(FILE *f)
+{
+    fseek(f, TAMANHO_BLOCO*(BLOCOS_FAT), SEEK_SET);
+    char buf[1];
+    for (int i = 0; i < N_BLOCOS; i++)
+    {
+        fgets(buf, 2, f);
+        bitmap[i] = atoi(buf);
+    }
+    //for (int i = 0; i < 50; i++) printf("bitmap[%d] = %d\n", i, bitmap[i]);
 }
 
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset)
