@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 
 #define N_BLOCOS 25000
 #define TAMANHO_BLOCO 4000
@@ -22,8 +23,11 @@ void cria_FAT(FILE *f);
 void carrega_FAT(FILE *f);
 void cria_bitmap(FILE *f);
 void carrega_bitmap(FILE *f);
+void cria_root(FILE* f);
 
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset);
+
+time_t rawtime;
 
 int main(int argc, char **argv)
 {
@@ -53,12 +57,11 @@ FILE *mount(char *nome_arquivo)
     printf("criou arquivo");
     cria_FAT(f);
     cria_bitmap(f);
-    //fclose(f);
-    /*Criar '/' e preencher resto dos blocos como vazios*/
+    cria_root(f);
+    for (int i = BLOCOS_FAT+BLOCOS_BITMAP+1; i < N_BLOCOS; i++)
+        preenche_bloco_vazio(f, i, 0);
     
     return f;
-    
-    
 }
 
 //Recebe um arquivo vazio e escreve a FAT nele, também a armazenando na memória
@@ -124,6 +127,16 @@ void carrega_bitmap(FILE *f)
     //for (int i = 0; i < 50; i++) printf("bitmap[%d] = %d\n", i, bitmap[i]);
 }
 
+//O root conterá os próprios metadados?
+void cria_root(FILE* f)
+{
+    fputc('/', f);
+    time(&rawtime);
+    fprintf(f, "%ld ", rawtime);
+    fprintf(f, "%ld ", rawtime);
+    fprintf(f, "%ld|", rawtime);
+}
+
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset)
 {
     fseek(f, (n_bloco*TAMANHO_BLOCO + offset), SEEK_SET);
@@ -132,9 +145,3 @@ void preenche_bloco_vazio(FILE *f, int n_bloco, int offset)
         fputc(0, f);
     }
 }
-
-
-/*if (access(path, F_OK) == 0)
-		return true;
-	else
-		return false;*/
