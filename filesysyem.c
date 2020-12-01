@@ -5,12 +5,19 @@
 
 #define N_BLOCOS 25000
 #define TAMANHO_BLOCO 4000
+#define BLOCOS_FAT 32
+#define BLOCOS_BITMAP 7
+//Macros do Bitmap (Talvez tenha que inverter, não lembro o que o daniel disse que preferia)
+#define LIVRE '1'
+#define OCUPADO '0'
 
 //Por enquanto ficará hardcoded já que sabemos o tamanho da tabela (acho q começa com zeros)
 int FAT[N_BLOCOS];
+char bitmap[N_BLOCOS];
 
 FILE *mount (char *nome_arquivo);
 void cria_FAT(FILE *f);
+void cria_BitMap(FILE *f);
 
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset);
 
@@ -37,6 +44,7 @@ FILE *mount(char *nome_arquivo)
     }
     printf("criou arquivo");
     cria_FAT(f);
+    cria_BitMap(f);
     fclose(f);
     
     return NULL;
@@ -49,10 +57,10 @@ void cria_FAT(FILE *f)
 {
     int i;
     //Primeiros 32 blocos pertencem a FAT
-    for (i = 0; i < 31; i++) FAT[i] = i+1;
+    for (i = 0; i < BLOCOS_FAT-1; i++) FAT[i] = i+1;
     FAT[i] = -1;
     //Proximos 7 blocos pertencem ao bitmap
-    for (i = 32; i < 38; i++) FAT[i] = i+1;
+    for (i = 32; i < 32+BLOCOS_BITMAP-1; i++) FAT[i] = i+1;
     FAT[i] = -1;
     //Primeiro bloco pertence ao /
     FAT[i+1] = -1;
@@ -60,7 +68,24 @@ void cria_FAT(FILE *f)
 
     //Devo escrever no arquivo já aqui?
     for (i = 0; i < N_BLOCOS; i++) fprintf(f, "%05d", FAT[i]);
-    preenche_bloco_vazio(f, 31, N_BLOCOS%TAMANHO_BLOCO);
+    preenche_bloco_vazio(f, BLOCOS_FAT-1, (N_BLOCOS*5)%TAMANHO_BLOCO);
+}
+
+void cria_BitMap(FILE *f)
+{
+    //BLOCOS_FAT+BLOCOS_BITMAP+1 engloba blocos destas duas estruturas + bloco inicial do '/'
+    int i;
+    for (i = 0; i < BLOCOS_FAT+BLOCOS_BITMAP+1; i++) 
+    {
+        bitmap[i] = OCUPADO;
+        fputc(OCUPADO, f);
+    }
+    for (int j = i; j < N_BLOCOS; j++) 
+    {
+        bitmap[j] = LIVRE;
+        fputc(LIVRE, f);
+    }
+    preenche_bloco_vazio(f, BLOCOS_FAT+BLOCOS_BITMAP-1, N_BLOCOS%TAMANHO_BLOCO);
 }
 
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset)
