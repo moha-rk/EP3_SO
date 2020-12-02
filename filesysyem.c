@@ -6,6 +6,7 @@
 
 #define N_BLOCOS 25000
 #define TAMANHO_BLOCO 4000
+#define TAMANHO_METADADOS_ROOT 34
 #define BLOCOS_FAT 32
 #define BLOCOS_BITMAP 7
 //Tamanho das entradas na FAT
@@ -60,6 +61,7 @@ FILE *mount(char *nome_arquivo)
     cria_root(f);
     for (int i = BLOCOS_FAT+BLOCOS_BITMAP+1; i < N_BLOCOS; i++)
         preenche_bloco_vazio(f, i, 0);
+    volta_pro_root(f);
     
     return f;
 }
@@ -144,4 +146,133 @@ void preenche_bloco_vazio(FILE *f, int n_bloco, int offset)
     {
         fputc(0, f);
     }
+}
+
+void volta_pro_root(FILE* f)
+{
+    fseek(f, TAMANHO_BLOCO*(BLOCOS_BITMAP+BLOCOS_FAT) + TAMANHO_METADADOS_ROOT, SEEK_SET);
+}
+
+//SA = Sistema de arquivos
+//add_arquivo deve conferir se há tamanho suficiente para o arquivo, buscar o diretorio onde deve ser salvo o arquivo, salvar seus metadados nesse diretorio e então salvar o arquivo em um ou mais blocos
+//add_arquivo sempre partirá do root
+int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
+{
+    int tamanho, blocos_arquivo;
+    char *diretorio_atual = "/";
+    FILE *arq;
+    if(!(arq = fopen(nome_origem, "r")))
+    {
+        fprintf(stderr, "O arquivo %s não pôde ser aberto\n", nome_origem);
+        return -1;
+    }
+    fseek(arq, 0, SEEK_END);
+    tamanho = ftell(arq);
+    blocos_arquivo = tamanho/TAMANHO_BLOCO;
+    if (tamanho%TAMANHO_BLOCO != 0) blocos_arquivo++;
+    rewind(arq);
+
+    int cont = 0;
+    //Ler de trás pra frente pois pro EP será mais rápido
+    for (int i = N_BLOCOS-1; i >= 0; i--)
+    {
+        if (bitmap[i] == LIVRE) {
+            cont++;
+            if (cont == blocos_arquivo) break;
+        }
+    }
+    if (cont < blocos_arquivo)
+    {
+        fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome_origem);
+        fclose(arq);
+        return -1;
+    }
+
+    //Aqui, devemos iniciar uma busca até encontrarmos o diretório no qual o arquivo deverá ser salvo
+    cont = 0;
+    for (int i = 0; i < strlen(nome_destino); i++)
+    {
+        if (nome_destino[i] == '/') cont++;
+    }
+    //Significa que o arquivo deve estar no root
+    if (cont <= 1);
+
+}
+
+int busca_diretorio_para_add(FILE *SA, FILE *arq, char *dir_atual, char *nome_atual, int tamanho)
+{
+    if (nome_atual[0] != '/')
+    {
+        //Chegamos no diretório
+        if (calcula_tamanho_metadados(nome_atual, tamanho) <= espaco_restante_bloco(SA, ftell(SA)%TAMANHO_BLOCO)){
+            //Adiciona metadados e copia arquivo para um bloco vazio
+        }
+        else{
+            //Avisa que não há espaço (ainda preciso adicionar as funções da FAT. Por enquanto ele olha um bloco só, tem q ver se o bloco continua (e isso é suave, só jogar o numero do bloco na fat e ver se é -1))
+        }
+    }
+    char dir_aux[255];
+    dir_aux[0] = '\0';
+    int i;
+    for (i = 1; i < strlen(nome_atual); i++)
+    {
+        if (nome_atual[i] == '/') break;
+        dir_aux[i-1] = nome_atual[i];
+    }
+    if (i == strlen(nome_atual)) 
+    {
+        busca_diretorio_para_add(SA, arq, dir_atual, dir_aux, tamanho);
+    
+    }
+    else
+    {
+
+    }
+
+
+}
+
+int encontra_bloco_diretorio(FILE *f, char *nome_dir)
+{
+    //Buscar no diretorio atual a entrada do proximo diretorio 'nome_dir', encontrando nela o valor do bloco do diretorio
+}
+
+//Nome+tamanho(arquivos)+tempos+endereço
+int calcula_tamanho_metadados(char *nome, int tamanho)
+{
+    int tam_digitos = 1, aux = tamanho;
+    if (aux == -1) tam_digitos = 0;
+    while (aux > 9) {
+        aux /= 10;
+        tam_digitos++;
+    }
+    //1 será identificação se é arquivo ou diretório, 33 é a soma dos tempos (acesso, modificação...), 5 é entrada da FAT e 1 é |
+    return 1+strlen(nome)+1+33+tam_digitos+5+1;
+}
+
+int espaco_restante_bloco(FILE *f, int n_bloco)
+{
+    int pos_anterior = ftell(f), pos_atual;
+    fseek(f, TAMANHO_BLOCO*n_bloco, SEEK_SET);
+    int ant = 0;
+
+    for (int i = 0; i < TAMANHO_BLOCO; i++)
+    {
+        if(getc(f) == '\0')
+        {
+           ant++;
+           if (ant == 2) break;
+        }
+        else ant = 0;
+    }
+    if (ant <= 1) 
+    {
+        fseek(f, pos_anterior, SEEK_SET);
+        return 0;
+    }
+    pos_atual = ftell(f) - 2;
+
+    fseek(f, pos_anterior, SEEK_SET);
+
+    return (TAMANHO_BLOCO*(n_bloco+1)) - pos_atual;
 }
