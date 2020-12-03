@@ -31,6 +31,7 @@ void preenche_bloco_vazio(FILE *f, int n_bloco, int offset);
 void volta_pro_root(FILE* f);
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
 int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont);
+int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir);
 
 time_t rawtime;
 
@@ -43,7 +44,10 @@ int main(int argc, char **argv)
     fputs("d1", SA);
     fputc('\0', SA);
     fputs("12345678901234567890123456789000321|", SA);
+    FAT[321] = -1;
     printf ("\n%d\n", procura_nome_e_devolve_info(SA, "d1", 1, BLOCO_ROOT));
+    printf ("\n%d\n", busca_diretorio(SA, "/", "/d1/arquivo.txt", BLOCO_ROOT));
+    
     return 0;
 }
 
@@ -183,12 +187,12 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     if (tamanho%TAMANHO_BLOCO != 0) blocos_arquivo++;
     rewind(arq);
 
-    int cont = 0;
-    //Ler de trás pra frente pois pro EP será mais rápido
-    for (int i = N_BLOCOS-1; i >= 0; i--)
+    int cont = 0, primeiro;
+    for (int i = BLOCO_ROOT; i < N_BLOCOS; i++)
     {
         if (bitmap[i] == LIVRE) {
             cont++;
+            if (cont == 1) primeiro = i;
             if (cont == blocos_arquivo) break;
         }
     }
@@ -200,27 +204,27 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     }
 
     //Aqui, devemos iniciar uma busca até encontrarmos o diretório no qual o arquivo deverá ser salvo
-    cont = 0;
-    for (int i = 0; i < strlen(nome_destino); i++)
-    {
-        if (nome_destino[i] == '/') cont++;
-    }
-    //Significa que o arquivo deve estar no root
-    if (cont <= 1);
+    
 
 }
 
 //dir_atual deve ser chamado com "/" e bloco_dir com o bloco do root
 //Devo alimentar a função com um caminho contendo o nome do arquivo no final?
 //entradas serão do tipo "/tmp/d1/arquivo.txt" ou "/tmp/d1"?
+//Acho que vou fazer uma função que busca o penultimo diretorio. Nos exemplos acima, deve buscar d1 e tmp.
+
+//Esta função devolve o bloco do diretorio anterior à última entrada (arquivo.txt ou d1 no exemplo acima)
+//dir_atual deve ser chamado com "/" e bloco_dir com o bloco do root, e nome_atual é o q queremos buscar
 int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
 {
+    
     if (strcmp(dir_atual, "/") == 0) volta_pro_root(SA);
     if (nome_atual[0] != '/')
     {
         //Chegamos no diretório
-        
+        return bloco_dir;
     }
+    
     char dir_aux[255];
     int i;
     for (i = 1; i < strlen(nome_atual); i++)
@@ -231,7 +235,7 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
     dir_aux[i-1] = '\0';
     if (i == strlen(nome_atual)) 
     {
-        busca_diretorio(SA, dir_atual, dir_aux, bloco_dir);
+        return busca_diretorio(SA, dir_atual, dir_aux, bloco_dir);
     }
     else
     {
@@ -244,7 +248,15 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
             return -1;
         }
         fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
-        busca_diretorio(SA, dir_atual, dir_aux, bloco_dir);
+        int j = 0;
+        char aux[255];
+        for (i; i < strlen(nome_atual); i++)
+        {
+            aux[j] = nome_atual[i];
+            j++;
+        }
+        aux[j] = '\0';
+        return busca_diretorio(SA, dir_aux, aux, bloco_dir);
     }
 
 
@@ -329,7 +341,7 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
             fseek(SA, , SEEK_SET);
         }*/
         fseek(SA, ftell(SA)+tamanho_entrada-(strlen(nome_lido)+1) - FAT_ENTRY, SEEK_SET);
-        
+
         for (i = 0; i < 5; i++) nome_lido[i] = fgetc(SA);
         nome_lido[i] = '\0';
         return atoi(nome_lido); //FAT
