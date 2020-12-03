@@ -258,8 +258,6 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
         aux[j] = '\0';
         return busca_diretorio(SA, dir_aux, aux, bloco_dir);
     }
-
-
 }
 
 //Procura o nome de um arquivo (regular ou diretorio) e devolve a informação pedida supondo que SA está no início do diretório a ser vasculhado
@@ -321,7 +319,7 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
         {
             i++;
             cont++;
-            //Não sei se deve ser == ou >
+            //Não sei se deve ser == ou > (acho q ==, por isso vou manter assim)
             if (cont >= TAMANHO_BLOCO)
                 if (!busca_continuacao_dir(SA, &bloco_dir, &cont)) return -1;
         }
@@ -329,17 +327,10 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
         i=0;
         cont += tamanho_entrada - (strlen(nome_lido) + 1);
     }
-    //Se saiu aqui é porque achamos a entrada e *SA aponta para o tamanho (caso seja arquivo regular) ou para o primeiro tempo caso seja um diretorio
+    //*SA aponta para o tamanho (caso seja arquivo regular) ou para o primeiro tempo caso seja um diretorio
     //Depois adiciono mais infos para devolver, por enquanto devolverei apenas o diretorio FAT
     if (info == 1) //Numero generico
     {
-        
-        /*
-        if (tamanho_entrada - (strlen(nome_lido) + 1) > 36)
-        {
-            //Arquivo regular
-            fseek(SA, , SEEK_SET);
-        }*/
         fseek(SA, ftell(SA)+tamanho_entrada-(strlen(nome_lido)+1) - FAT_ENTRY, SEEK_SET);
 
         for (i = 0; i < 5; i++) nome_lido[i] = fgetc(SA);
@@ -364,48 +355,46 @@ int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont)
     }
 }
 
-
-int encontra_bloco_diretorio(FILE *f, char *nome_dir)
-{
-    //Buscar no diretorio atual a entrada do proximo diretorio 'nome_dir', encontrando nela o valor do bloco do diretorio
-}
-
 //Nome+tamanho(arquivos)+tempos+endereço
+//"tamanho = -1" se for diretorio. "tamanho = bytes" caso arquivo regular
 int calcula_tamanho_metadados(char *nome, int tamanho)
 {
-    int tam_digitos = 1, aux = tamanho;
-    if (aux == -1) tam_digitos = 0;
-    while (aux > 9) {
-        aux /= 10;
-        tam_digitos++;
-    }
-    //1 será identificação se é arquivo ou diretório, 33 é a soma dos tempos (acesso, modificação...), 5 é entrada da FAT e 1 é |
-    return 1+strlen(nome)+1+33+tam_digitos+5+1;
+    int tam_digitos = digitos(tamanho);
+    //30 é a soma dos tempos (acesso, modificação...), 5 é entrada da FAT e 1 é |
+    return strlen(nome)+1+30+tam_digitos+5+1;
 }
 
-int espaco_restante_bloco(FILE *f, int n_bloco)
+//Por enquanto, esta função irá manter o ponteiro SA na primeira posição vazia do bloco
+int espaco_restante_bloco(FILE *SA, int n_bloco)
 {
-    int pos_anterior = ftell(f), pos_atual;
-    fseek(f, TAMANHO_BLOCO*n_bloco, SEEK_SET);
+    int pos_anterior = ftell(SA), pos_atual;
+    fseek(SA, TAMANHO_BLOCO*n_bloco, SEEK_SET);
     int ant = 0;
+    char penultimo, aux;
 
     for (int i = 0; i < TAMANHO_BLOCO; i++)
     {
-        if(getc(f) == '\0')
+        if((aux = getc(SA)) == '\0')
         {
            ant++;
            if (ant == 2) break;
         }
-        else ant = 0;
+        else 
+        {
+            ant = 0;
+            penultimo = aux;
+        }
     }
-    if (ant <= 1) 
+    if (ant == 1 && penultimo == '|') return 1;
+    if (ant <= 1)
     {
-        fseek(f, pos_anterior, SEEK_SET);
+        //fseek(SA, pos_anterior, SEEK_SET);
         return 0;
     }
-    pos_atual = ftell(f) - 2;
+    pos_atual = ftell(SA) - 2;
 
-    fseek(f, pos_anterior, SEEK_SET);
+    //fseek(SA, pos_anterior, SEEK_SET);
+    fseek(SA, ftell(SA)-2, SEEK_SET);
 
     return (TAMANHO_BLOCO*(n_bloco+1)) - pos_atual;
 }
@@ -413,13 +402,78 @@ int espaco_restante_bloco(FILE *f, int n_bloco)
 //Essa função não é muito legal. Diz quanto espaço tem mas não em qual bloco. Poderia
 //passar um ponteiro de booleano como parametro e deixá-lo verdadeiro caso tenha espaço e devolver o numero 
 //do bloco e falso caso não tenha espaço e o numero do bloco
-int espaco_restante_diretorio(FILE *f, int bloco_dir)
+//Talvez seja util da forma que está. Bastaria adicionar alocação de novo bloco na próxima função
+int espaco_restante_diretorio(FILE *SA, int *bloco_dir)
 {
-    int espaco_atual = espaco_restante_bloco(f, bloco_dir);
-    while (FAT[bloco_dir] != -1 && espaco_atual == 0)
+    int espaco_atual = espaco_restante_bloco(SA, *bloco_dir);
+    while (FAT[*bloco_dir] != -1 && espaco_atual == 0)
+    {
+        *bloco_dir = FAT[*bloco_dir];
+        espaco_atual = espaco_restante_bloco(SA, *bloco_dir);
+    }
+    return espaco_atual;
+}
+
+//Adiciona entrada com metadados de um arquivo a um diretorio
+//bloco_dir = bloco do diretorio pai, nome = nome do arquivo, tamanho = -1 se diretorio, bloco_alocado = bloco alocado para o arquivo
+//Acho que farei com que sempre que essa função seja chamada, o diretorio ja tenha espaço para essa entrada
+//Da forma que está, SA já está posicionado no byte que quero escrever
+void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho, int bloco_alocado)
+{
+    int tamanho_entrada = calcula_tamanho_metadados(nome, tamanho);
+    char e1[5], e2[40];
+    time(&rawtime);
+    sprintf(e1, "%d", tamanho_entrada);
+    sprintf(e2, "%ld%ld%ld|", rawtime, rawtime, rawtime);
+    for (int i = 0; i < strlen(e1); i++)
+    {
+        fputc(e1[i], SA);
+        if (ftell(SA)-1%TAMANHO_BLOCO == 0)
+        {
+            bloco_dir = FAT[bloco_dir];
+            fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
+        }
+    }
+    fputc('\0', SA);
+    if (ftell(SA)-1%TAMANHO_BLOCO == 0)
     {
         bloco_dir = FAT[bloco_dir];
-        espaco_atual = espaco_restante_bloco(f, bloco_dir);
+        fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
     }
-    if (espaco_atual != 0) return espaco_atual;
+    for (int i = 0; i < strlen(nome); i++)
+    {
+        fputc(nome[i], SA);
+        if (ftell(SA)-1%TAMANHO_BLOCO == 0)
+        {
+            bloco_dir = FAT[bloco_dir];
+            fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
+        }
+    }
+    fputc('\0', SA);
+    if (ftell(SA)-1%TAMANHO_BLOCO == 0)
+    {
+        bloco_dir = FAT[bloco_dir];
+        fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
+    }
+    for (int i = 0; i < strlen(e2); i++)
+    {
+        fputc(e2[i], SA);
+        if (ftell(SA)-1%TAMANHO_BLOCO == 0)
+        {
+            bloco_dir = FAT[bloco_dir];
+            fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
+        }
+    }
+
+}
+
+int digitos(int n)
+{
+    int tam_digitos = 1, n;
+    if (n == -1) tam_digitos = 0;
+    while (n > 9) {
+        n /= 10;
+        tam_digitos++;
+    }
+    return tam_digitos;
 }
