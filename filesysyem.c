@@ -32,6 +32,11 @@ void volta_pro_root(FILE* f);
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
 int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont);
 int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir);
+int espaco_restante_diretorio(FILE *SA, int *bloco_dir);
+char *remove_dirs_nome(char* nome);
+
+int calcula_tamanho_metadados(char *nome, int tamanho);
+int digitos(int n);
 
 time_t rawtime;
 
@@ -46,7 +51,9 @@ int main(int argc, char **argv)
     fputs("12345678901234567890123456789000321|", SA);
     FAT[321] = -1;
     printf ("\n%d\n", procura_nome_e_devolve_info(SA, "d1", 1, BLOCO_ROOT));
-    printf ("\n%d\n", busca_diretorio(SA, "/", "/d1/arquivo.txt", BLOCO_ROOT));
+    char *a = "/d1/arquivo.txt";
+    printf ("\n%d\n", busca_diretorio(SA, "/", a, BLOCO_ROOT));
+    printf("%s", a);
     
     return 0;
 }
@@ -204,8 +211,51 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     }
 
     //Aqui, devemos iniciar uma busca até encontrarmos o diretório no qual o arquivo deverá ser salvo
-    
+    int dir = busca_diretorio(SA, "/", nome_destino, BLOCO_ROOT);
+    if (dir == -1) return -1;
+    nome_destino = remove_dirs_nome(nome_destino);
+    int tam_metadados = calcula_tamanho_metadados(nome_destino, -1);
+    if (espaco_restante_diretorio(SA, &dir) < tam_metadados + digitos(tam_metadados) + 1)
+    {
+        //Aloco novo bloco para o diretorio
+        cont = 0;
+        int segundo;
+        for (int i = primeiro+1; i < N_BLOCOS; i++)
+        {
+            if (bitmap[i] == LIVRE) {
+                cont++;
+                if (cont == 1) segundo = i;
+                if (cont == blocos_arquivo) break;
+            }
+        }
+        if (cont < blocos_arquivo)
+        {
+            fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome_origem);
+            fclose(arq);
+            return -1;
+        }
+        FAT[dir] = primeiro;
+        bitmap[primeiro] = OCUPADO;
+        primeiro = segundo;
+    }
+    //Resta apenas alocar aqui o bloco primeiro (talvez outros) para o arquivo em questão e salvar seus dados lá
+    adiciona_metadados_arquivo(SA, dir, nome_destino, tamanho, primeiro);
 
+}
+
+char *remove_dirs_nome(char *nome)
+{
+    int i, j = 0;
+    char *aux;
+    aux = malloc(strlen(nome)*sizeof(char));
+    for (i = 0; i < strlen(nome); i++)
+    {
+        aux[j] = nome[i];
+        j++;
+        if (nome[i] == '/') j = 0;
+    }
+    aux[j+1] = '\0';
+    return aux;
 }
 
 //dir_atual deve ser chamado com "/" e bloco_dir com o bloco do root
@@ -232,10 +282,12 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
         if (nome_atual[i] == '/') break;
         dir_aux[i-1] = nome_atual[i];
     }
+
     dir_aux[i-1] = '\0';
     if (i == strlen(nome_atual)) 
     {
-        return busca_diretorio(SA, dir_atual, dir_aux, bloco_dir);
+        nome_atual = dir_aux;
+        return busca_diretorio(SA, dir_atual, nome_atual, bloco_dir);
     }
     else
     {
@@ -256,7 +308,8 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
             j++;
         }
         aux[j] = '\0';
-        return busca_diretorio(SA, dir_aux, aux, bloco_dir);
+        nome_atual = aux;
+        return busca_diretorio(SA, dir_aux, nome_atual, bloco_dir);
     }
 }
 
@@ -340,6 +393,7 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
 
 }
 
+//Essa função altera o valor de bloco_dir para o proximo valor na FAT (caso != -1), altera cont usado na funcção acima e devolve 1 caso o diretorio possua mais um bloco e 0 caso contrário
 int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont)
 {
     if (FAT[*bloco_dir] != -1)
@@ -427,49 +481,49 @@ void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho
     sprintf(e2, "%ld%ld%ld|", rawtime, rawtime, rawtime);
     for (int i = 0; i < strlen(e1); i++)
     {
-        fputc(e1[i], SA);
         if (ftell(SA)-1%TAMANHO_BLOCO == 0)
         {
             bloco_dir = FAT[bloco_dir];
             fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
         }
+        fputc(e1[i], SA);
     }
-    fputc('\0', SA);
     if (ftell(SA)-1%TAMANHO_BLOCO == 0)
     {
         bloco_dir = FAT[bloco_dir];
         fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
     }
+    fputc('\0', SA);
     for (int i = 0; i < strlen(nome); i++)
     {
-        fputc(nome[i], SA);
         if (ftell(SA)-1%TAMANHO_BLOCO == 0)
         {
             bloco_dir = FAT[bloco_dir];
             fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
         }
+        fputc(nome[i], SA);
     }
-    fputc('\0', SA);
     if (ftell(SA)-1%TAMANHO_BLOCO == 0)
     {
         bloco_dir = FAT[bloco_dir];
         fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
     }
+    fputc('\0', SA);
     for (int i = 0; i < strlen(e2); i++)
     {
-        fputc(e2[i], SA);
         if (ftell(SA)-1%TAMANHO_BLOCO == 0)
         {
             bloco_dir = FAT[bloco_dir];
             fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
         }
+        fputc(e2[i], SA);
     }
 
 }
 
 int digitos(int n)
 {
-    int tam_digitos = 1, n;
+    int tam_digitos = 1;
     if (n == -1) tam_digitos = 0;
     while (n > 9) {
         n /= 10;
