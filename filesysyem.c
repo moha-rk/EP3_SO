@@ -28,6 +28,9 @@ void carrega_bitmap(FILE *f);
 void cria_root(FILE* f);
 
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset);
+void aloca_bloco(FILE *SA, int dir1);
+void estende_bloco(FILE *SA, int dir1, int dir2);
+int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino);
 void volta_pro_root(FILE* f);
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
 int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont);
@@ -35,6 +38,7 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir);
 int espaco_restante_diretorio(FILE *SA, int *bloco_dir);
 char *remove_dirs_nome(char* nome);
 
+void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho, int bloco_alocado);
 int calcula_tamanho_metadados(char *nome, int tamanho);
 int digitos(int n);
 
@@ -49,12 +53,14 @@ int main(int argc, char **argv)
     fputs("d1", SA);
     fputc('\0', SA);
     fputs("12345678901234567890123456789000321|", SA);
-    FAT[321] = -1;
+    //FAT[321] = -1;
+    aloca_bloco(SA, 321);
     printf ("\n%d\n", procura_nome_e_devolve_info(SA, "d1", 1, BLOCO_ROOT));
     char *a = "/d1/arquivo.txt";
-    printf ("\n%d\n", busca_diretorio(SA, "/", a, BLOCO_ROOT));
-    printf("%s", a);
-    
+    add_arquivo(SA, "ideias.txt", "/d1/arquivo.txt");
+    //printf ("\n%d\n", busca_diretorio(SA, "/", a, BLOCO_ROOT));
+    //printf("%s", a);
+    fclose(SA);
     return 0;
 }
 
@@ -101,6 +107,7 @@ void cria_FAT(FILE *f)
     //Primeiro bloco pertence ao '/'
     FAT[i+1] = -1;
     //Depois vejo se preciso zerar o resto dos elementos
+    for (i = i+2; i < N_BLOCOS; i++) FAT[i] = 0;
 
     //Devo escrever no arquivo já aqui?
     for (i = 0; i < N_BLOCOS; i++) fprintf(f, "%05d", FAT[i]);
@@ -139,14 +146,13 @@ void cria_bitmap(FILE *f)
 }
 
 //Recebe um arquivo vazio e carrega o bitmap escrita nele
-void carrega_bitmap(FILE *f)
+void carrega_bitmap(FILE *SA)
 {
-    fseek(f, TAMANHO_BLOCO*(BLOCOS_FAT), SEEK_SET);
+    fseek(SA, TAMANHO_BLOCO*(BLOCOS_FAT), SEEK_SET);
     char buf[1];
     for (int i = 0; i < N_BLOCOS; i++)
     {
-        fgets(buf, 2, f);
-        bitmap[i] = atoi(buf);
+        bitmap[i] = fgetc(SA);
     }
     //for (int i = 0; i < 50; i++) printf("bitmap[%d] = %d\n", i, bitmap[i]);
 }
@@ -178,6 +184,7 @@ void volta_pro_root(FILE* f)
 //SA = Sistema de arquivos
 //add_arquivo deve conferir se há tamanho suficiente para o arquivo, buscar o diretorio onde deve ser salvo o arquivo, salvar seus metadados nesse diretorio e então salvar o arquivo em um ou mais blocos
 //add_arquivo sempre partirá do root
+//Adicionar forma de usar essa função para o touch
 int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
 {
     int tamanho, blocos_arquivo;
@@ -194,13 +201,13 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     if (tamanho%TAMANHO_BLOCO != 0) blocos_arquivo++;
     rewind(arq);
 
-    int cont = 0, primeiro;
+    int cont = 0, primeiro, segundo;
     for (int i = BLOCO_ROOT; i < N_BLOCOS; i++)
     {
         if (bitmap[i] == LIVRE) {
             cont++;
             if (cont == 1) primeiro = i;
-            if (cont == blocos_arquivo) break;
+            if (cont >= blocos_arquivo) break;
         }
     }
     if (cont < blocos_arquivo)
@@ -219,7 +226,6 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     {
         //Aloco novo bloco para o diretorio
         cont = 0;
-        int segundo;
         for (int i = primeiro+1; i < N_BLOCOS; i++)
         {
             if (bitmap[i] == LIVRE) {
@@ -234,13 +240,66 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
             fclose(arq);
             return -1;
         }
-        FAT[dir] = primeiro;
-        bitmap[primeiro] = OCUPADO;
+        estende_bloco(SA, dir, primeiro);
         primeiro = segundo;
     }
     //Resta apenas alocar aqui o bloco primeiro (talvez outros) para o arquivo em questão e salvar seus dados lá
     adiciona_metadados_arquivo(SA, dir, nome_destino, tamanho, primeiro);
 
+    aloca_bloco(SA, primeiro);
+    for(int i = 0; i < blocos_arquivo; i++)
+    {
+        if (tamanho > TAMANHO_BLOCO)
+        {
+            for (int j = 0; j < TAMANHO_BLOCO; j++) fputc(fgetc(arq), SA);
+            tamanho -= TAMANHO_BLOCO;
+            for (segundo = primeiro+1; bitmap[segundo] != LIVRE; segundo++);
+            
+            estende_bloco(SA, primeiro, segundo);
+            primeiro = segundo;
+        }
+        else
+        {
+            for (int j = 0; j < tamanho; j++) fputc(fgetc(arq), SA);
+            tamanho = 0;
+        }
+    }
+    return 0; //Acho
+}
+
+//Aloca um bloco e aponta SA para ele
+void aloca_bloco(FILE *SA, int dir1)
+{
+    FAT[dir1] = -1;
+    bitmap[dir1] = OCUPADO;
+    //Escrever FAT
+    fseek(SA, dir1*FAT_ENTRY, SEEK_SET);
+    fprintf(SA, "%05d", FAT[dir1]);
+
+    //Escrever bitmap
+    fseek(SA, (TAMANHO_BLOCO*BLOCOS_FAT)+dir1, SEEK_SET);
+    fputc(OCUPADO, SA);
+
+    fseek(SA, dir1*TAMANHO_BLOCO, SEEK_SET);
+}
+
+//Aloca mais um bloco e aponta SA para ele
+void estende_bloco(FILE *SA, int dir1, int dir2)
+{
+    FAT[dir1] = dir2;
+    FAT[dir2] = -1;
+    bitmap[dir2] = OCUPADO;
+    //Escrever FAT
+    fseek(SA, dir1*FAT_ENTRY, SEEK_SET);
+    fprintf(SA, "%05d", FAT[dir1]);
+    fseek(SA, dir2*FAT_ENTRY, SEEK_SET);
+    fprintf(SA, "%05d", FAT[dir2]);
+
+    //Escrever bitmap
+    fseek(SA, (TAMANHO_BLOCO*BLOCOS_FAT)+dir2, SEEK_SET);
+    fputc(OCUPADO, SA);
+
+    fseek(SA, dir2*TAMANHO_BLOCO, SEEK_SET);
 }
 
 char *remove_dirs_nome(char *nome)
@@ -478,7 +537,7 @@ void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho
     char e1[5], e2[40];
     time(&rawtime);
     sprintf(e1, "%d", tamanho_entrada);
-    sprintf(e2, "%ld%ld%ld|", rawtime, rawtime, rawtime);
+    sprintf(e2, "%10ld%10ld%10ld%05d|", rawtime, rawtime, rawtime, bloco_alocado);
     for (int i = 0; i < strlen(e1); i++)
     {
         if (ftell(SA)-1%TAMANHO_BLOCO == 0)
@@ -509,6 +568,20 @@ void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho
         fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
     }
     fputc('\0', SA);
+    if (tamanho != -1)
+    {
+        char tam[10];
+        sprintf(tam, "%d", tamanho);
+        for (int i = 0; i < strlen(tam); i++)
+        {
+            if (ftell(SA)-1%TAMANHO_BLOCO == 0)
+            {
+                bloco_dir = FAT[bloco_dir];
+                fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
+            }
+            fputc(tam[i], SA);
+        }
+    }
     for (int i = 0; i < strlen(e2); i++)
     {
         if (ftell(SA)-1%TAMANHO_BLOCO == 0)
