@@ -9,6 +9,7 @@
 #define TAMANHO_METADADOS_ROOT 34
 #define BLOCOS_FAT 32
 #define BLOCOS_BITMAP 7
+#define BLOCO_ROOT 39
 //Tamanho das entradas na FAT
 #define FAT_ENTRY 5
 //Macros do Bitmap (Talvez tenha que inverter, não lembro o que o daniel disse que preferia)
@@ -27,12 +28,22 @@ void carrega_bitmap(FILE *f);
 void cria_root(FILE* f);
 
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset);
+void volta_pro_root(FILE* f);
+int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
+int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont);
 
 time_t rawtime;
 
 int main(int argc, char **argv)
 {
-    mount("abc.txt");
+    FILE *SA = mount("abc.txt");
+    fseek(SA, BLOCO_ROOT*TAMANHO_BLOCO + TAMANHO_METADADOS_ROOT, SEEK_SET);
+    fputs("39", SA);
+    fputc('\0', SA);
+    fputs("d1", SA);
+    fputc('\0', SA);
+    fputs("12345678901234567890123456789000321|", SA);
+    printf ("\n%d\n", procura_nome_e_devolve_info(SA, "d1", 1, BLOCO_ROOT));
     return 0;
 }
 
@@ -150,7 +161,7 @@ void preenche_bloco_vazio(FILE *f, int n_bloco, int offset)
 
 void volta_pro_root(FILE* f)
 {
-    fseek(f, TAMANHO_BLOCO*(BLOCOS_BITMAP+BLOCOS_FAT) + TAMANHO_METADADOS_ROOT, SEEK_SET);
+    fseek(f, TAMANHO_BLOCO*BLOCO_ROOT + TAMANHO_METADADOS_ROOT, SEEK_SET);
 }
 
 //SA = Sistema de arquivos
@@ -199,41 +210,10 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
 
 }
 
-//Seria melhor fazer uma função que apenas busca o diretorio em questão e deixar a adição para outra função
-int busca_diretorio_para_add(FILE *SA, FILE *arq, char *dir_atual, char *nome_atual, int tamanho)
-{
-    if (nome_atual[0] != '/')
-    {
-        //Chegamos no diretório
-        if (calcula_tamanho_metadados(nome_atual, tamanho) <= espaco_restante_bloco(SA, ftell(SA)%TAMANHO_BLOCO)){
-            //Adiciona metadados e copia arquivo para um bloco vazio
-        }
-        else{
-            //Avisa que não há espaço (ainda preciso adicionar as funções da FAT. Por enquanto ele olha um bloco só, tem q ver se o bloco continua (e isso é suave, só jogar o numero do bloco na fat e ver se é -1))
-        }
-    }
-    char dir_aux[255];
-    dir_aux[0] = '\0';
-    int i;
-    for (i = 1; i < strlen(nome_atual); i++)
-    {
-        if (nome_atual[i] == '/') break;
-        dir_aux[i-1] = nome_atual[i];
-    }
-    if (i == strlen(nome_atual)) 
-    {
-        busca_diretorio_para_add(SA, arq, dir_atual, dir_aux, tamanho);
-    
-    }
-    else
-    {
-
-    }
-
-
-}
-
-int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual)
+//dir_atual deve ser chamado com "/" e bloco_dir com o bloco do root
+//Devo alimentar a função com um caminho contendo o nome do arquivo no final?
+//entradas serão do tipo "/tmp/d1/arquivo.txt" ou "/tmp/d1"?
+int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
 {
     if (strcmp(dir_atual, "/") == 0) volta_pro_root(SA);
     if (nome_atual[0] != '/')
@@ -251,12 +231,20 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual)
     dir_aux[i-1] = '\0';
     if (i == strlen(nome_atual)) 
     {
-        busca_diretorio(SA, dir_atual, dir_aux);
+        busca_diretorio(SA, dir_atual, dir_aux, bloco_dir);
     }
     else
     {
         //Preciso mexer *SA para o bloco de dir_aux antes de chamar a função novamente
-        busca_diretorio(SA, dir_atual, dir_aux);
+        bloco_dir = procura_nome_e_devolve_info(SA, dir_aux, 1, bloco_dir);
+        if (bloco_dir == -1)
+        {
+            fprintf(stderr, "%s não foi encontrado em %s\n", dir_aux, dir_atual);
+            volta_pro_root(SA);
+            return -1;
+        }
+        fseek(SA, TAMANHO_BLOCO*bloco_dir, SEEK_SET);
+        busca_diretorio(SA, dir_atual, dir_aux, bloco_dir);
     }
 
 
@@ -267,6 +255,13 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
 {
     //cont armazenará quantos bytes foram lidos do bloco atual
     int cont = 0, i = 0, tamanho_entrada, aux, tam_digitos;
+
+    if (bloco_dir == BLOCO_ROOT)
+    {
+        volta_pro_root(SA);
+        cont += TAMANHO_METADADOS_ROOT;
+    }
+    
     char nome_lido[255];
     while((nome_lido[i] = fgetc(SA)) != '\0') i++;
     if (nome_lido[0] == '\0')
@@ -326,16 +321,18 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
     //Depois adiciono mais infos para devolver, por enquanto devolverei apenas o diretorio FAT
     if (info == 1) //Numero generico
     {
+        
         /*
         if (tamanho_entrada - (strlen(nome_lido) + 1) > 36)
         {
             //Arquivo regular
             fseek(SA, , SEEK_SET);
         }*/
-        fseek(SA, ftell(SA)+tamanho_entrada-(strlen(nome_lido)+1), SEEK_SET);
+        fseek(SA, ftell(SA)+tamanho_entrada-(strlen(nome_lido)+1) - FAT_ENTRY, SEEK_SET);
+        
         for (i = 0; i < 5; i++) nome_lido[i] = fgetc(SA);
         nome_lido[i] = '\0';
-        return atoi(nome_lido);
+        return atoi(nome_lido); //FAT
     }
 
 }
