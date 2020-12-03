@@ -199,6 +199,7 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
 
 }
 
+//Seria melhor fazer uma função que apenas busca o diretorio em questão e deixar a adição para outra função
 int busca_diretorio_para_add(FILE *SA, FILE *arq, char *dir_atual, char *nome_atual, int tamanho)
 {
     if (nome_atual[0] != '/')
@@ -231,6 +232,129 @@ int busca_diretorio_para_add(FILE *SA, FILE *arq, char *dir_atual, char *nome_at
 
 
 }
+
+int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual)
+{
+    if (strcmp(dir_atual, "/") == 0) volta_pro_root(SA);
+    if (nome_atual[0] != '/')
+    {
+        //Chegamos no diretório
+        
+    }
+    char dir_aux[255];
+    int i;
+    for (i = 1; i < strlen(nome_atual); i++)
+    {
+        if (nome_atual[i] == '/') break;
+        dir_aux[i-1] = nome_atual[i];
+    }
+    dir_aux[i-1] = '\0';
+    if (i == strlen(nome_atual)) 
+    {
+        busca_diretorio(SA, dir_atual, dir_aux);
+    }
+    else
+    {
+        //Preciso mexer *SA para o bloco de dir_aux antes de chamar a função novamente
+        busca_diretorio(SA, dir_atual, dir_aux);
+    }
+
+
+}
+
+//Procura o nome de um arquivo (regular ou diretorio) e devolve a informação pedida supondo que SA está no início do diretório a ser vasculhado
+int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
+{
+    //cont armazenará quantos bytes foram lidos do bloco atual
+    int cont = 0, i = 0, tamanho_entrada, aux, tam_digitos;
+    char nome_lido[255];
+    while((nome_lido[i] = fgetc(SA)) != '\0') i++;
+    if (nome_lido[0] == '\0')
+    {
+        return -1;
+    }
+    tamanho_entrada = atoi(nome_lido);
+    i=0;
+    while((nome_lido[i] = fgetc(SA)) != '\0') i++;
+    i=0;
+    aux = tamanho_entrada;
+    tam_digitos = 0;
+    while (aux > 9) {
+        aux /= 10;
+        tam_digitos++;
+    }
+    cont += tamanho_entrada + tam_digitos + 1;
+
+    while(strcmp(nome_lido, nome) != 0)
+    {
+        if (cont >= TAMANHO_BLOCO)
+            if (!busca_continuacao_dir(SA, &bloco_dir, &cont)) return -1;
+
+        //Aqui, nome_lido contém o nome errado e SA aponta para o primeiro caracter após \0
+        //tamanho_entrada\0nome\0(tamanho)tempo1tempo2tempo3FAT|
+        //tamanho_entrada = strlen(nome)+1+ndigitosTamanho+30+5+1
+        fseek(SA, ftell(SA)+tamanho_entrada-(strlen(nome_lido)+1), SEEK_SET);
+        //Aqui, estou no nome da próxima entrada (ou em \0 se o diretorio tiver acabado)
+
+        while((nome_lido[i] = fgetc(SA)) != '\0')
+        {
+            i++;
+            cont++;
+            //Não sei se deve ser == ou >
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont)) return -1;
+        }
+        if (nome_lido[0] == '\0') return -1;
+        cont++;
+        if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont)) return -1;
+        tamanho_entrada = atoi(nome_lido);
+        i=0;
+        while((nome_lido[i] = fgetc(SA)) != '\0')
+        {
+            i++;
+            cont++;
+            //Não sei se deve ser == ou >
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont)) return -1;
+        }
+        cont++;
+        i=0;
+        cont += tamanho_entrada - (strlen(nome_lido) + 1);
+    }
+    //Se saiu aqui é porque achamos a entrada e *SA aponta para o tamanho (caso seja arquivo regular) ou para o primeiro tempo caso seja um diretorio
+    //Depois adiciono mais infos para devolver, por enquanto devolverei apenas o diretorio FAT
+    if (info == 1) //Numero generico
+    {
+        /*
+        if (tamanho_entrada - (strlen(nome_lido) + 1) > 36)
+        {
+            //Arquivo regular
+            fseek(SA, , SEEK_SET);
+        }*/
+        fseek(SA, ftell(SA)+tamanho_entrada-(strlen(nome_lido)+1), SEEK_SET);
+        for (i = 0; i < 5; i++) nome_lido[i] = fgetc(SA);
+        nome_lido[i] = '\0';
+        return atoi(nome_lido);
+    }
+
+}
+
+int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont)
+{
+    if (FAT[*bloco_dir] != -1)
+    {
+        *bloco_dir = FAT[*bloco_dir];
+        *cont = *cont - TAMANHO_BLOCO;
+        fseek(SA, (*bloco_dir)*TAMANHO_BLOCO + *cont, SEEK_SET);
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
 
 int encontra_bloco_diretorio(FILE *f, char *nome_dir)
 {
@@ -275,4 +399,18 @@ int espaco_restante_bloco(FILE *f, int n_bloco)
     fseek(f, pos_anterior, SEEK_SET);
 
     return (TAMANHO_BLOCO*(n_bloco+1)) - pos_atual;
+}
+
+//Essa função não é muito legal. Diz quanto espaço tem mas não em qual bloco. Poderia
+//passar um ponteiro de booleano como parametro e deixá-lo verdadeiro caso tenha espaço e devolver o numero 
+//do bloco e falso caso não tenha espaço e o numero do bloco
+int espaco_restante_diretorio(FILE *f, int bloco_dir)
+{
+    int espaco_atual = espaco_restante_bloco(f, bloco_dir);
+    while (FAT[bloco_dir] != -1 && espaco_atual == 0)
+    {
+        bloco_dir = FAT[bloco_dir];
+        espaco_atual = espaco_restante_bloco(f, bloco_dir);
+    }
+    if (espaco_atual != 0) return espaco_atual;
 }
