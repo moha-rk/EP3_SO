@@ -264,6 +264,7 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
             tamanho = 0;
         }
     }
+    free(nome_destino);
     return 0; //Acho
 }
 

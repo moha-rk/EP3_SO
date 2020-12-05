@@ -1,0 +1,16 @@
+Criar arquivos (vazios com touch)
+Copiar arquivos
+Apagar arquivos
+Criar diretorios
+Apagar diretorios
+Acessar arquivos
+Ler diretorios
+Informações sobre o sistema de arquivos
+
+Para copiar e criar arquivos e criar diretorios, preciso primeiro conferir se temos espaço (bloco(s)) livre para adicionar o arquivo, e então ser capaz de chegar ao diretorio pai destes arquivos a serem criados. Depois, preciso conferir se nesse diretorio temos espaço para adicionar os metadados deste arquivo, olhando no bloco atual e nos blocos ligados a ele. Caso não tenha espaço, preciso checar se há mais um bloco livre para alocar para este diretorio (fora os blocos a serem alocados para o arquivo em si), e então alocar o bloco em questão, e só então salvar o arquivo no sistema de arquivos.
+Para criar diretório, basta adicionar os metadados no pai e então alocar um bloco vazio para ele, setando o valor na fat para -1 e colocando o numero deste bloco nos metadados.
+Preciso de uma função de busca, que partirá do root e navegará até encontrar o bloco no qual o diretório está. Acho que neste caso é melhor uma função que devolve o primeiro bloco do diretório, pois para ler arquivos deve ser assim, e caso seja um diretorio, basta procurar na FAT caso o que eu queria não esteja no bloco atual.
+
+Definir em definitivo formato das entradas:
+    tamanhodaentrada\0nome\0(tamanho)tempo1tempo2tempo3FAT|
+    tamanhodaentrada = strlen(nome)+1?+ndigitosTamanho+30+5+1
