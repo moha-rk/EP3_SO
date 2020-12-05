@@ -563,11 +563,15 @@ void remove_arquivo(FILE *SA, char *nome)
         fseek(SA, ftell(SA) + tamanho_entrada - (strlen(nome_lido) + 1), SEEK_SET);
         //Aqui, estou no nome da próxima entrada (ou em \0 se o diretorio tiver acabado)
     }
+    fseek(SA, -FAT_ENTRY-1, SEEK_CUR);
+    for (i = 0; i < FAT_ENTRY; i++) nome_lido[i] = fgetc(SA);
+    nome_lido[i] = '\0';
+    fgetc(SA); //Para passar o |
+    int bloco_entrada = atoi(nome_lido);
     int distancia = tamanho_entrada + digitos(tamanho_entrada)+1;
     fseek(SA, ftell(SA) - distancia, SEEK_SET);
     //*SA aponta para o tamanho (caso seja arquivo regular) ou para o primeiro tempo caso seja um diretorio
     long pos_anterior;
-    //ANOTAR BLOCO DA ENTRADA A SER APAGADA
     while(1){
         //Talvez <=
         if (ftell(SA) + distancia < (bloco_dir+1)*TAMANHO_BLOCO){
@@ -593,8 +597,16 @@ void remove_arquivo(FILE *SA, char *nome)
             break;
         }
     }
-    //APAGAR BLOCOS SETANDO BITMAP PARA LIVRE E FAT PARA 0.
     free(nome);
+
+    do
+    {
+        bitmap[bloco_entrada] = LIVRE;
+        int aux = FAT[bloco_entrada];
+        FAT[bloco_entrada] = 0;
+        bloco_entrada = aux;
+    } while (bloco_entrada != -1);
+    
 
 }
 
