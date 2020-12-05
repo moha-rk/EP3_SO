@@ -52,6 +52,8 @@ void acabou_bloco(FILE *SA, int *bloco_dir);
 int calcula_tamanho_metadados(char *nome, int tamanho);
 int digitos(int n);
 
+void imprime_arquivo(FILE *SA, char *nome);
+
 time_t rawtime;
 time_t currtime;
 
@@ -96,13 +98,15 @@ int main(int argc, char **argv)
     aloca_bloco(SA, 325);
     fseek(SA, aux, SEEK_SET);
     //printf ("\n%d\n", procura_nome_e_devolve_info(SA, "d1", 1, BLOCO_ROOT));
-    lista_itens_diretorio(SA, "/d1");
-    remove_arquivo(SA, "/d1/arq.txt");
-    remove_arquivo(SA, "/d1/d2");
-    lista_itens_diretorio(SA, "/d1");
+    //lista_itens_diretorio(SA, "/d1");
+    //remove_arquivo(SA, "/d1/arq.txt");
+    //remove_arquivo(SA, "/d1/d2");
+    //lista_itens_diretorio(SA, "/d1");
+    lista_itens_diretorio(SA, "/");
     
     //char *a = "/d1/arquivo.txt";
-    //add_arquivo(SA, "ideias.txt", "/d1/arquivo.txt");
+    //add_arquivo(SA, "ideias.txt", "/arquivo.txt");
+    imprime_arquivo(SA, "/arquivo.txt");
     //printf ("\n%d\n", busca_diretorio(SA, "/", a, BLOCO_ROOT));
     //printf("%s", a);
 
@@ -510,7 +514,7 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
 {
     //cont armazenará quantos bytes foram lidos do bloco atual
-    int cont = 0, i = 0, tamanho_entrada, aux, tam_digitos;
+    int cont = 0, i = 0, tamanho_entrada;
 
     if (bloco_dir == BLOCO_ROOT)
     {
@@ -577,7 +581,7 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
 
 void remove_arquivo(FILE *SA, char *nome)
 {
-    int cont = 0, i = 0, tamanho_entrada, aux, tam_digitos;
+    int cont = 0, i = 0, tamanho_entrada;
     int bloco_dir = busca_diretorio(SA, "/", nome, BLOCO_ROOT);
 
     if (bloco_dir == BLOCO_ROOT)
@@ -681,11 +685,12 @@ void lista_itens_diretorio(FILE *SA, char *nome)
     //faz um loop percorrendo o bloco
     //dai usa esse loop pra imprimir as informaço~es
     //printf("nomedoarquivo time1 time2 time3");
-    int cont = 0, i = 0, tamanho_entrada, aux, tam_digitos, bloco_dir;
+    int cont = 0, i = 0, tamanho_entrada, bloco_dir;
     char buf[255];
     buf[0] = '\0';
     strcat(buf, nome);
-    strcat(buf, "/a");
+    if (strcmp(nome, "/") != 0)
+        strcat(buf, "/a");
     bloco_dir = busca_diretorio(SA, "/", buf, BLOCO_ROOT);
 
     if (bloco_dir == BLOCO_ROOT)
@@ -748,7 +753,7 @@ void lista_itens_diretorio(FILE *SA, char *nome)
             }
             nome_lido[j] = '\0';
             currtime = atol(nome_lido);
-            fprintf(stderr, " %s\n", ctime(&currtime));
+            fprintf(stderr, " %s", ctime(&currtime));
         }
         else
         {
@@ -762,7 +767,7 @@ void lista_itens_diretorio(FILE *SA, char *nome)
             }
             nome_lido[j] = '\0';
             currtime = atol(nome_lido);
-            fprintf(stderr, " %s\n", ctime(&currtime));
+            fprintf(stderr, " %s", ctime(&currtime));
         }
         fseek(SA, FAT_ENTRY+1, SEEK_CUR);
     }
@@ -894,6 +899,78 @@ void acabou_bloco(FILE *SA, int *bloco_dir)
         *bloco_dir = FAT[*bloco_dir];
         fseek(SA, TAMANHO_BLOCO * (*bloco_dir), SEEK_SET);
     }
+}
+
+//Função para ser usada com cat
+void imprime_arquivo(FILE *SA, char *nome)
+{
+    int cont = 0, i = 0, tamanho_entrada;
+    int bloco_dir = busca_diretorio(SA, "/", nome, BLOCO_ROOT);
+
+    if (bloco_dir == BLOCO_ROOT)
+    {
+        volta_pro_root(SA);
+        cont += TAMANHO_METADADOS_ROOT;
+    }
+
+    char nome_lido[255], c;
+    nome = remove_dirs_nome(nome);
+    fprintf(stderr, "nome = %s\n", nome);
+
+    while (strcmp(nome_lido, nome) != 0)
+    {
+
+        if (cont >= TAMANHO_BLOCO)
+            if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+            {    free(nome);return;}
+
+        //Aqui, nome_lido contém o nome errado e SA aponta para o primeiro caracter após \0
+        while ((nome_lido[i] = fgetc(SA)) != '\0')
+        {
+            i++;
+            cont++;
+            //Não sei se deve ser == ou >
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                {    free(nome);return;}
+        }
+        if (nome_lido[0] == '\0')
+        {    free(nome);return;}
+        cont++;
+        if (cont >= TAMANHO_BLOCO)
+            if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+            {    free(nome);return;}
+        tamanho_entrada = atoi(nome_lido);
+        i = 0;
+        while ((nome_lido[i] = fgetc(SA)) != '\0')
+        {
+            i++;
+            cont++;
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                {    free(nome);return;}
+        }
+        cont++;
+        i = 0;
+        cont += tamanho_entrada - (strlen(nome_lido) + 1);
+
+        fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1), SEEK_CUR);
+        //Aqui, estou no nome da próxima entrada (ou em \0 se o diretorio tiver acabado)
+    }
+    fseek(SA, -FAT_ENTRY-1, SEEK_CUR);
+    for (i = 0; i < FAT_ENTRY; i++) nome_lido[i] = fgetc(SA);
+    nome_lido[i] = '\0';
+    int bloco_entrada = atoi(nome_lido);
+    fseek(SA, bloco_entrada*TAMANHO_BLOCO, SEEK_SET);
+    free(nome);
+
+    char aux;
+    do
+    {
+        for (i = 0; i<TAMANHO_BLOCO && ((aux = fgetc(SA))!='\0'); i++) fprintf(stderr, "%c", aux);
+        bloco_entrada = FAT[bloco_entrada];
+    } while (bloco_entrada != -1);
+    fprintf(stderr, "\n");
 }
 
 int digitos(int n)
