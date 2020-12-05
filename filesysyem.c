@@ -46,9 +46,12 @@ void lista_itens_diretorio(FILE *SA, char *nome);
 int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont);
 int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir);
 int espaco_restante_diretorio(FILE *SA, int *bloco_dir);
+int espaco_restante_bloco(FILE *SA, int bloco_dir);
 char *remove_dirs_nome(char *nome);
 
 void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco_diretorio_pai, char *dir_pai);
+void df(FILE *SA, int bloco_dir_atual, int *ndirs, int *narquivos, int primeira_chamada);
+
 
 void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho, int bloco_alocado);
 void acabou_bloco(FILE *SA, int *bloco_dir);
@@ -139,7 +142,8 @@ int main(int argc, char **argv)
     //remove_diretorio(SA, BLOCO_ROOT, "/d1", 1);
     //fprintf(stderr, "*************FIM CHAMADA DA FUNÇÂO DE REMOÇÂO****************\n");
 
-    
+    int a = 0, b = 0;
+    df(SA, BLOCO_ROOT, &a, &b, 1);
 
 
     //lista_itens_diretorio(SA, "/");
@@ -622,6 +626,110 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
     }
 }
 
+void df(FILE *SA, int bloco_dir_atual, int *ndirs, int *narquivos, int primeira_chamada)
+{
+    //Primeiro, faremos uma busca em profundidade para encontrar o numeor de arquivos e diretorios (sem contar o root)
+    int cont = 0, i = 0, tamanho_entrada;
+
+    if (bloco_dir_atual == BLOCO_ROOT)
+    {
+        volta_pro_root(SA);
+        cont += TAMANHO_METADADOS_ROOT;
+    }
+    else
+        fseek(SA, bloco_dir_atual*TAMANHO_BLOCO, SEEK_SET);
+    char nome_lido[255];
+    while (1)
+    {
+        if (cont >= TAMANHO_BLOCO)
+            if (!busca_continuacao_dir(SA, &bloco_dir_atual, &cont))
+                break;
+        //Aqui, nome_lido contém o nome errado e SA aponta para o primeiro caracter após \0
+
+        while ((nome_lido[i] = fgetc(SA)) != '\0')
+        {
+            i++;
+            cont++;
+            //Não sei se deve ser == ou >
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir_atual, &cont))
+                    break;
+        }
+        //fprintf(stderr, "nomelido=%s\n", nome_lido);
+        if (nome_lido[0] == '\0' || cont >= TAMANHO_BLOCO)
+            break;
+        cont++;
+        if (cont >= TAMANHO_BLOCO)
+            if (!busca_continuacao_dir(SA, &bloco_dir_atual, &cont))
+                break;
+        tamanho_entrada = atoi(nome_lido);
+        i = 0;
+        while ((nome_lido[i] = fgetc(SA)) != '\0')
+        {
+            i++;
+            cont++;
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir_atual, &cont))
+                    break;
+        }
+        if (cont >= TAMANHO_BLOCO) break;
+        cont++;
+        i = 0;
+        fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1) - (FAT_ENTRY+1), SEEK_CUR);
+        cont += tamanho_entrada - (strlen(nome_lido) + 1) - (FAT_ENTRY+1);
+        if (cont >= TAMANHO_BLOCO)
+            if (!busca_continuacao_dir(SA, &bloco_dir_atual, &cont))
+                break;
+
+        if (tamanho_entrada == calcula_tamanho_metadados(nome_lido, -1))
+        {
+            //Achei um diretorio
+            *ndirs += 1;
+            int j;
+            for (j = 0; j < FAT_ENTRY; j++) {
+                nome_lido[j] = fgetc(SA);
+                cont++;
+                if (cont >= TAMANHO_BLOCO)
+                        if (!busca_continuacao_dir(SA, &bloco_dir_atual, &cont))
+                            break;
+            }
+            nome_lido[j] = '\0';
+            fgetc(SA);//Para passar o |
+            cont++; 
+            int bloco_entrada = atoi(nome_lido);
+            long pos_anterior = ftell(SA);
+            df(SA, bloco_entrada, ndirs, narquivos, 0);
+            fseek(SA, pos_anterior, SEEK_SET);
+        }
+        else
+        {
+            *narquivos += 1;
+            cont += FAT_ENTRY+1;
+            fseek(SA, FAT_ENTRY+1, SEEK_CUR);
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir_atual, &cont))
+                    break;
+        }
+        //Aqui, estou no nome da próxima entrada (ou em \0 se o diretorio tiver acabado)
+    }
+    //Saindo aqui, tenho o numero de arquivos e de diretorios
+    if (!primeira_chamada) return;
+    
+    fprintf(stderr, "Numero de arquivos regulares: %d\n", *narquivos);
+    fprintf(stderr, "Numero de diretórios: %d\n", *ndirs);
+
+    long blocos_livres = 0;
+    long memoria_desperdicada = 0;
+
+    for (i = 0; i < N_BLOCOS; i++)
+    {
+        if (bitmap[i] == LIVRE) blocos_livres++;
+        else memoria_desperdicada += espaco_restante_bloco(SA, i);
+    }
+    fprintf(stderr, "Espaço livre (em bytes): %ld\n", blocos_livres*TAMANHO_BLOCO);
+    fprintf(stderr, "Espaço desperdiçado (em bytes): %ld\n", memoria_desperdicada);
+}
+
 void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco_diretorio_pai, char *dir_pai)
 {
     int cont = 0, i = 0, tamanho_entrada, bloco_dir;
@@ -772,7 +880,14 @@ void remove_arquivo(FILE *SA, char *nome)
         //Aqui, estou no nome da próxima entrada (ou em \0 se o diretorio tiver acabado)
     }
     fseek(SA, -FAT_ENTRY-1, SEEK_CUR);
-    for (i = 0; i < FAT_ENTRY; i++) nome_lido[i] = fgetc(SA);
+    for (i = 0; i < FAT_ENTRY; i++) 
+    {
+        nome_lido[i] = fgetc(SA);
+        cont++;
+        if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                {    free(nome);return;}
+    }
     nome_lido[i] = '\0';
     fgetc(SA); //Para passar o |
     int bloco_entrada = atoi(nome_lido);
@@ -877,7 +992,14 @@ void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int pr
         //Aqui já lemos o nome
         fseek(SA, tamanho_entrada-(strlen(nome_lido)+1)-FAT_ENTRY-1, SEEK_CUR);
         char fat_buf[6];
-        for (i = 0; i < FAT_ENTRY; i++) fat_buf[i] = fgetc(SA);
+        for (i = 0; i < FAT_ENTRY; i++) 
+        {
+            fat_buf[i] = fgetc(SA);
+            cont++;
+            if (cont >= TAMANHO_BLOCO)
+                    if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                        return;
+        }    
         fat_buf[i] = '\0';
         fgetc(SA); //Para passar o |
         int bloco_entrada = atoi(fat_buf);
@@ -1005,7 +1127,7 @@ void lista_itens_diretorio(FILE *SA, char *nome)
     }
 }
 
-//Essa função altera o valor de bloco_dir para o proximo valor na FAT (caso != -1), altera cont usado na funcção acima e devolve 1 caso o diretorio possua mais um bloco e 0 caso contrário
+//Essa função altera o valor de bloco_dir para o proximo valor na FAT (caso != -1), altera cont usado na função acima e devolve 1 caso o diretorio possua mais um bloco e 0 caso contrário
 int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont)
 {
     if (FAT[*bloco_dir] != -1)
@@ -1190,7 +1312,14 @@ void imprime_arquivo(FILE *SA, char *nome)
         //Aqui, estou no nome da próxima entrada (ou em \0 se o diretorio tiver acabado)
     }
     fseek(SA, -FAT_ENTRY-1, SEEK_CUR);
-    for (i = 0; i < FAT_ENTRY; i++) nome_lido[i] = fgetc(SA);
+    for (i = 0; i < FAT_ENTRY; i++) 
+    {
+        nome_lido[i] = fgetc(SA);
+        cont++;
+        if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                {    free(nome);return;}
+    }
     nome_lido[i] = '\0';
     int bloco_entrada = atoi(nome_lido);
     fseek(SA, bloco_entrada*TAMANHO_BLOCO, SEEK_SET);
