@@ -34,7 +34,7 @@ void aloca_bloco(FILE *SA, int dir1);
 void estende_bloco(FILE *SA, int dir1, int dir2);
 
 int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino);
-int add_arquivo_vazio(FILE *SA, char *nome_destino);
+int add_arquivo_vazio(FILE *SA, char *nome_destino, int tamanho);
 int busca_espaco_metadados(FILE *SA, int dir, int tam_metadados, int *primeiro, int segundo, int blocos_arquivo);
 
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
@@ -103,10 +103,13 @@ int main(int argc, char **argv)
     //remove_arquivo(SA, "/d1/d2");
     //lista_itens_diretorio(SA, "/d1");
     lista_itens_diretorio(SA, "/");
+    add_arquivo_vazio(SA, "/teste1.txt", 0);
+    add_arquivo_vazio(SA, "/d5", -1);
+    lista_itens_diretorio(SA, "/");
     
     //char *a = "/d1/arquivo.txt";
     //add_arquivo(SA, "ideias.txt", "/arquivo.txt");
-    imprime_arquivo(SA, "/arquivo.txt");
+    //imprime_arquivo(SA, "/arquivo.txt");
     //printf ("\n%d\n", busca_diretorio(SA, "/", a, BLOCO_ROOT));
     //printf("%s", a);
 
@@ -238,7 +241,6 @@ void volta_pro_root(FILE *f)
 //SA = Sistema de arquivos
 //add_arquivo deve conferir se há tamanho suficiente para o arquivo, buscar o diretorio onde deve ser salvo o arquivo, salvar seus metadados nesse diretorio e então salvar o arquivo em um ou mais blocos
 //add_arquivo sempre partirá do root
-//Adicionar forma de usar essa função para o touch
 int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
 {
     int tamanho, blocos_arquivo;
@@ -319,11 +321,11 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     return 0; //Acho
 }
 
-int add_arquivo_vazio(FILE *SA, char *nome_destino)
+//Chamar com tamanho = 0 para arquivo vazio (touch) e tamanho = -1 para mkdir
+int add_arquivo_vazio(FILE *SA, char *nome, int tamanho)
 {
-    int tamanho, blocos_arquivo;
+    int blocos_arquivo;
     char *diretorio_atual = "/";
-    tamanho = 0;
     blocos_arquivo = 1;
 
     int cont = 0, primeiro, segundo;
@@ -340,30 +342,30 @@ int add_arquivo_vazio(FILE *SA, char *nome_destino)
     }
     if (cont < blocos_arquivo)
     {
-        fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome_destino);
+        fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome);
         return -1;
     }
 
     //Aqui, devemos iniciar uma busca até encontrarmos o diretório no qual o arquivo deverá ser salvo
-    int dir = busca_diretorio(SA, "/", nome_destino, BLOCO_ROOT);
+    int dir = busca_diretorio(SA, "/", nome, BLOCO_ROOT);
     if (dir == -1)
     {
         fprintf(stderr, "O diretório não foi encontrado\n");
         return -1;
     }
-    nome_destino = remove_dirs_nome(nome_destino);
-    int tam_metadados = calcula_tamanho_metadados(nome_destino, tamanho);
+    nome = remove_dirs_nome(nome);
+    int tam_metadados = calcula_tamanho_metadados(nome, tamanho);
     
     dir = busca_espaco_metadados(SA, dir, tam_metadados, &primeiro, segundo, blocos_arquivo);
     if (dir == -1)
     {
-        fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome_destino);
+        fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome);
         return -1;
     }
-    adiciona_metadados_arquivo(SA, dir, nome_destino, tamanho, primeiro);
+    adiciona_metadados_arquivo(SA, dir, nome, tamanho, primeiro);
 
     aloca_bloco(SA, primeiro);
-    free(nome_destino);
+    free(nome);
     return 0; //Acho
 }
 
