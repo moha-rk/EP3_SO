@@ -557,15 +557,15 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
         i = 0;
         cont += tamanho_entrada - (strlen(nome_lido) + 1);
 
-        fseek(SA, ftell(SA) + tamanho_entrada - (strlen(nome_lido) + 1), SEEK_SET);
+        fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1), SEEK_CUR);
         //Aqui, estou no nome da próxima entrada (ou em \0 se o diretorio tiver acabado)
     }
-    fseek(SA, ftell(SA) - tamanho_entrada + (strlen(nome_lido) + 1), SEEK_SET);
+    fseek(SA, -tamanho_entrada + (strlen(nome_lido) + 1), SEEK_CUR);
     //*SA aponta para o tamanho (caso seja arquivo regular) ou para o primeiro tempo caso seja um diretorio
     //Depois adiciono mais infos para devolver, por enquanto devolverei apenas o diretorio FAT
     if (info == 1) //Numero generico
     {
-        fseek(SA, ftell(SA) + tamanho_entrada - (strlen(nome_lido) + 1) - FAT_ENTRY, SEEK_SET);
+        fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1) - FAT_ENTRY, SEEK_CUR);
 
         for (i = 0; i < 5; i++)
             nome_lido[i] = fgetc(SA);
@@ -626,7 +626,7 @@ void remove_arquivo(FILE *SA, char *nome)
         i = 0;
         cont += tamanho_entrada - (strlen(nome_lido) + 1);
 
-        fseek(SA, ftell(SA) + tamanho_entrada - (strlen(nome_lido) + 1), SEEK_SET);
+        fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1), SEEK_CUR);
         //Aqui, estou no nome da próxima entrada (ou em \0 se o diretorio tiver acabado)
     }
     fseek(SA, -FAT_ENTRY-1, SEEK_CUR);
@@ -635,14 +635,14 @@ void remove_arquivo(FILE *SA, char *nome)
     fgetc(SA); //Para passar o |
     int bloco_entrada = atoi(nome_lido);
     int distancia = tamanho_entrada + digitos(tamanho_entrada)+1;
-    fseek(SA, ftell(SA) - distancia, SEEK_SET);
+    fseek(SA, - distancia, SEEK_CUR);
     //*SA aponta para o tamanho (caso seja arquivo regular) ou para o primeiro tempo caso seja um diretorio
     long pos_anterior;
     while(1){
         //Talvez <=
         if (ftell(SA) + distancia < (bloco_dir+1)*TAMANHO_BLOCO){
             pos_anterior = ftell(SA);
-            fseek(SA, pos_anterior + distancia, SEEK_SET);
+            fseek(SA, distancia, SEEK_CUR);
             c = fgetc(SA);
             fseek(SA, pos_anterior, SEEK_SET);
             fputc(c, SA);
@@ -741,7 +741,7 @@ void lista_itens_diretorio(FILE *SA, char *nome)
             {
                 fprintf(stderr, "%c", fgetc(SA));
             }
-            fseek(SA, ftell(SA)+TAMANHO_TIME*2, SEEK_SET);
+            fseek(SA, TAMANHO_TIME*2, SEEK_CUR);
             for (j = 0; j < TAMANHO_TIME; j++)
             {
                 nome_lido[j] = fgetc(SA);
@@ -755,7 +755,7 @@ void lista_itens_diretorio(FILE *SA, char *nome)
             //Diretorio
             fprintf(stderr, "%s/ ", nome_lido);
             int j;
-            fseek(SA, ftell(SA)+TAMANHO_TIME*2, SEEK_SET);
+            fseek(SA, TAMANHO_TIME*2, SEEK_CUR);
             for (j = 0; j < TAMANHO_TIME; j++)
             {
                 nome_lido[j] = fgetc(SA);
@@ -764,7 +764,7 @@ void lista_itens_diretorio(FILE *SA, char *nome)
             currtime = atol(nome_lido);
             fprintf(stderr, " %s\n", ctime(&currtime));
         }
-        fseek(SA, ftell(SA)+FAT_ENTRY+1, SEEK_SET);
+        fseek(SA, FAT_ENTRY+1, SEEK_CUR);
     }
 }
 
@@ -825,7 +825,7 @@ int espaco_restante_bloco(FILE *SA, int n_bloco)
     pos_atual = ftell(SA) - 2;
 
     //fseek(SA, pos_anterior, SEEK_SET);
-    fseek(SA, ftell(SA) - 2, SEEK_SET);
+    fseek(SA, - 2, SEEK_CUR);
 
     return (TAMANHO_BLOCO * (n_bloco + 1)) - pos_atual;
 }
