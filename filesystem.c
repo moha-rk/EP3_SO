@@ -42,7 +42,6 @@ void remove_arquivo(FILE *SA, char *nome);
 void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int primeira_chamada);
 void atualiza_tempos(FILE *SA, char *dir_pai);
 
-int cria_diretorio(FILE *SA, char *nome_origem);
 void lista_itens_diretorio(FILE *SA, char *nome);
 int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont);
 int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir);
@@ -341,16 +340,6 @@ int busca_espaco_metadados(FILE *SA, int dir, int tam_metadados, int *primeiro, 
             *primeiro = segundo;
         }
     return dir;
-}
-
-int cria_diretorio(FILE *SA, char *nome_origem)
-{
-    //adiciona metadados do diretorio no pai
-
-    //aloca bloco para o diretorio
-
-    //retorna bloco do diretorio
-    return 0;
 }
 
 //Aloca um bloco e aponta SA para ele
