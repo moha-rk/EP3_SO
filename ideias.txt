@@ -14,3 +14,5 @@ Preciso de uma função de busca, que partirá do root e navegará até encontra
 Definir em definitivo formato das entradas:
     tamanhodaentrada\0nome\0(tamanho)tempo1tempo2tempo3FAT|
     tamanhodaentrada = strlen(nome)+1?+ndigitosTamanho+30+5+1
+
+Rm vai ser: apagar metadados e limpar fat e bitmap
