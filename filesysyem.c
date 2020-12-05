@@ -34,6 +34,9 @@ void aloca_bloco(FILE *SA, int dir1);
 void estende_bloco(FILE *SA, int dir1, int dir2);
 
 int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino);
+int add_arquivo_vazio(FILE *SA, char *nome_destino);
+int busca_espaco_metadados(FILE *SA, int dir, int tam_metadados, int *primeiro, int segundo, int blocos_arquivo);
+
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
 void remove_arquivo(FILE *SA, char *nome);
 
@@ -45,6 +48,7 @@ int espaco_restante_diretorio(FILE *SA, int *bloco_dir);
 char *remove_dirs_nome(char *nome);
 
 void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho, int bloco_alocado);
+void acabou_bloco(FILE *SA, int *bloco_dir);
 int calcula_tamanho_metadados(char *nome, int tamanho);
 int digitos(int n);
 
@@ -270,34 +274,21 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     //Aqui, devemos iniciar uma busca até encontrarmos o diretório no qual o arquivo deverá ser salvo
     int dir = busca_diretorio(SA, "/", nome_destino, BLOCO_ROOT);
     if (dir == -1)
+    {
+        fprintf(stderr, "O diretório não foi encontrado\n");
         return -1;
+    }
     nome_destino = remove_dirs_nome(nome_destino);
     int tam_metadados = calcula_tamanho_metadados(nome_destino, -1);
-    if (espaco_restante_diretorio(SA, &dir) < tam_metadados + digitos(tam_metadados) + 1)
+    
+    dir = busca_espaco_metadados(SA, dir, tam_metadados, &primeiro, segundo, blocos_arquivo);
+    if (dir == -1)
     {
-        //Aloco novo bloco para o diretorio
-        cont = 0;
-        for (int i = primeiro + 1; i < N_BLOCOS; i++)
-        {
-            if (bitmap[i] == LIVRE)
-            {
-                cont++;
-                if (cont == 1)
-                    segundo = i;
-                if (cont == blocos_arquivo)
-                    break;
-            }
-        }
-        if (cont < blocos_arquivo)
-        {
-            fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome_origem);
-            fclose(arq);
-            return -1;
-        }
-        estende_bloco(SA, dir, primeiro);
-        primeiro = segundo;
+        fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome_origem);
+        fclose(arq);
+        return -1;
     }
-    //Resta apenas alocar aqui o bloco primeiro (talvez outros) para o arquivo em questão e salvar seus dados lá
+    //Resta apenas alocar aqui o primeiro bloco (talvez outros) para o arquivo em questão e salvar seus dados lá
     adiciona_metadados_arquivo(SA, dir, nome_destino, tamanho, primeiro);
 
     aloca_bloco(SA, primeiro);
@@ -308,8 +299,7 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
             for (int j = 0; j < TAMANHO_BLOCO; j++)
                 fputc(fgetc(arq), SA);
             tamanho -= TAMANHO_BLOCO;
-            for (segundo = primeiro + 1; bitmap[segundo] != LIVRE; segundo++)
-                ;
+            for (segundo = primeiro + 1; bitmap[segundo] != LIVRE; segundo++);
 
             estende_bloco(SA, primeiro, segundo);
             primeiro = segundo;
@@ -325,8 +315,84 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     return 0; //Acho
 }
 
+int add_arquivo_vazio(FILE *SA, char *nome_destino)
+{
+    int tamanho, blocos_arquivo;
+    char *diretorio_atual = "/";
+    tamanho = 0;
+    blocos_arquivo = 1;
+
+    int cont = 0, primeiro, segundo;
+    for (int i = BLOCO_ROOT; i < N_BLOCOS; i++)
+    {
+        if (bitmap[i] == LIVRE)
+        {
+            cont++;
+            if (cont == 1)
+                primeiro = i;
+            if (cont >= blocos_arquivo)
+                break;
+        }
+    }
+    if (cont < blocos_arquivo)
+    {
+        fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome_destino);
+        return -1;
+    }
+
+    //Aqui, devemos iniciar uma busca até encontrarmos o diretório no qual o arquivo deverá ser salvo
+    int dir = busca_diretorio(SA, "/", nome_destino, BLOCO_ROOT);
+    if (dir == -1)
+    {
+        fprintf(stderr, "O diretório não foi encontrado\n");
+        return -1;
+    }
+    nome_destino = remove_dirs_nome(nome_destino);
+    int tam_metadados = calcula_tamanho_metadados(nome_destino, tamanho);
+    
+    dir = busca_espaco_metadados(SA, dir, tam_metadados, &primeiro, segundo, blocos_arquivo);
+    if (dir == -1)
+    {
+        fprintf(stderr, "Não há espaço suficiente para adicionar %s ao sistema\n", nome_destino);
+        return -1;
+    }
+    adiciona_metadados_arquivo(SA, dir, nome_destino, tamanho, primeiro);
+
+    aloca_bloco(SA, primeiro);
+    free(nome_destino);
+    return 0; //Acho
+}
+
+int busca_espaco_metadados(FILE *SA, int dir, int tam_metadados, int *primeiro, int segundo, int blocos_arquivo)
+{
+    if (espaco_restante_diretorio(SA, &dir) < tam_metadados + digitos(tam_metadados) + 1)
+        {
+            //Aloco novo bloco para o diretorio
+            int cont = 0;
+            for (int i = *primeiro + 1; i < N_BLOCOS; i++)
+            {
+                if (bitmap[i] == LIVRE)
+                {
+                    cont++;
+                    if (cont == 1)
+                        segundo = i;
+                    if (cont == blocos_arquivo)
+                        break;
+                }
+            }
+            if (cont < blocos_arquivo)
+                return -1;
+
+            estende_bloco(SA, dir, *primeiro);
+            *primeiro = segundo;
+        }
+    return dir;
+}
+
 int cria_diretorio(FILE *SA, char *nome_origem)
 {
+    //adiciona metadados do diretorio no pai
+
     //aloca bloco para o diretorio
 
     //retorna bloco do diretorio
@@ -792,33 +858,17 @@ void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho
     sprintf(e2, "%10ld%10ld%10ld%05d|", rawtime, rawtime, rawtime, bloco_alocado);
     for (int i = 0; i < strlen(e1); i++)
     {
-        if (ftell(SA) - 1 % TAMANHO_BLOCO == 0)
-        {
-            bloco_dir = FAT[bloco_dir];
-            fseek(SA, TAMANHO_BLOCO * bloco_dir, SEEK_SET);
-        }
+        acabou_bloco(SA, &bloco_dir);
         fputc(e1[i], SA);
     }
-    if (ftell(SA) - 1 % TAMANHO_BLOCO == 0)
-    {
-        bloco_dir = FAT[bloco_dir];
-        fseek(SA, TAMANHO_BLOCO * bloco_dir, SEEK_SET);
-    }
+    acabou_bloco(SA, &bloco_dir);
     fputc('\0', SA);
     for (int i = 0; i < strlen(nome); i++)
     {
-        if (ftell(SA) - 1 % TAMANHO_BLOCO == 0)
-        {
-            bloco_dir = FAT[bloco_dir];
-            fseek(SA, TAMANHO_BLOCO * bloco_dir, SEEK_SET);
-        }
+        acabou_bloco(SA, &bloco_dir);
         fputc(nome[i], SA);
     }
-    if (ftell(SA) - 1 % TAMANHO_BLOCO == 0)
-    {
-        bloco_dir = FAT[bloco_dir];
-        fseek(SA, TAMANHO_BLOCO * bloco_dir, SEEK_SET);
-    }
+    acabou_bloco(SA, &bloco_dir);
     fputc('\0', SA);
     if (tamanho != -1)
     {
@@ -826,22 +876,23 @@ void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho
         sprintf(tam, "%d", tamanho);
         for (int i = 0; i < strlen(tam); i++)
         {
-            if (ftell(SA) - 1 % TAMANHO_BLOCO == 0)
-            {
-                bloco_dir = FAT[bloco_dir];
-                fseek(SA, TAMANHO_BLOCO * bloco_dir, SEEK_SET);
-            }
+            acabou_bloco(SA, &bloco_dir);
             fputc(tam[i], SA);
         }
     }
     for (int i = 0; i < strlen(e2); i++)
     {
-        if (ftell(SA) - 1 % TAMANHO_BLOCO == 0)
-        {
-            bloco_dir = FAT[bloco_dir];
-            fseek(SA, TAMANHO_BLOCO * bloco_dir, SEEK_SET);
-        }
+        acabou_bloco(SA, &bloco_dir);
         fputc(e2[i], SA);
+    }
+}
+
+void acabou_bloco(FILE *SA, int *bloco_dir)
+{
+    if (ftell(SA) % TAMANHO_BLOCO == 0)
+    {
+        *bloco_dir = FAT[*bloco_dir];
+        fseek(SA, TAMANHO_BLOCO * (*bloco_dir), SEEK_SET);
     }
 }
 
