@@ -39,11 +39,12 @@ int busca_espaco_metadados(FILE *SA, int dir, int tam_metadados, int *primeiro, 
 
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
 void remove_arquivo(FILE *SA, char *nome);
+void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int primeira_chamada);
 
 int cria_diretorio(FILE *SA, char *nome_origem);
 void lista_itens_diretorio(FILE *SA, char *nome);
 int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont);
-int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir);
+int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir);
 int espaco_restante_diretorio(FILE *SA, int *bloco_dir);
 char *remove_dirs_nome(char *nome);
 
@@ -102,15 +103,21 @@ int main(int argc, char **argv)
     //remove_arquivo(SA, "/d1/arq.txt");
     //remove_arquivo(SA, "/d1/d2");
     //lista_itens_diretorio(SA, "/d1");
+    //lista_itens_diretorio(SA, "/");
+    //add_arquivo_vazio(SA, "/teste1.txt", 0);
+    //add_arquivo_vazio(SA, "/d5", -1);
+    lista_itens_diretorio(SA, "/d1");
     lista_itens_diretorio(SA, "/");
-    add_arquivo_vazio(SA, "/teste1.txt", 0);
-    add_arquivo_vazio(SA, "/d5", -1);
+    fprintf(stderr, "*************CHAMADA DA FUNÇÂO DE REMOÇÂO****************\n");
+    remove_diretorio(SA, BLOCO_ROOT, "/d1", 1);
+    fprintf(stderr, "*************FIM CHAMADA DA FUNÇÂO DE REMOÇÂO****************\n");
+
     lista_itens_diretorio(SA, "/");
     
     //char *a = "/d1/arquivo.txt";
     //add_arquivo(SA, "ideias.txt", "/arquivo.txt");
     //imprime_arquivo(SA, "/arquivo.txt");
-    //printf ("\n%d\n", busca_diretorio(SA, "/", a, BLOCO_ROOT));
+    //printf ("\n%d\n", busca_diretorio_pai(SA, "/", a, BLOCO_ROOT));
     //printf("%s", a);
 
     fclose(SA);
@@ -278,7 +285,7 @@ int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
     }
 
     //Aqui, devemos iniciar uma busca até encontrarmos o diretório no qual o arquivo deverá ser salvo
-    int dir = busca_diretorio(SA, "/", nome_destino, BLOCO_ROOT);
+    int dir = busca_diretorio_pai(SA, "/", nome_destino, BLOCO_ROOT);
     if (dir == -1)
     {
         fprintf(stderr, "O diretório não foi encontrado\n");
@@ -347,7 +354,7 @@ int add_arquivo_vazio(FILE *SA, char *nome, int tamanho)
     }
 
     //Aqui, devemos iniciar uma busca até encontrarmos o diretório no qual o arquivo deverá ser salvo
-    int dir = busca_diretorio(SA, "/", nome, BLOCO_ROOT);
+    int dir = busca_diretorio_pai(SA, "/", nome, BLOCO_ROOT);
     if (dir == -1)
     {
         fprintf(stderr, "O diretório não foi encontrado\n");
@@ -463,7 +470,7 @@ char *remove_dirs_nome(char *nome)
 
 //Esta função devolve o bloco do diretorio anterior à última entrada (arquivo.txt ou d1 no exemplo acima)
 //dir_atual deve ser chamado com "/" e bloco_dir com o bloco do root, e nome_atual é o q queremos buscar
-int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
+int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
 {
     if (strcmp(dir_atual, "/") == 0)
         volta_pro_root(SA);
@@ -479,14 +486,14 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
     {
         if (nome_atual[i] == '/')
             break;
-        dir_aux[i - 1] = nome_atual[i];
+        dir_aux[i-1] = nome_atual[i];
     }
 
-    dir_aux[i - 1] = '\0';
+    dir_aux[i-1] = '\0';
     if (i == strlen(nome_atual))
     {
         nome_atual = dir_aux;
-        return busca_diretorio(SA, dir_atual, nome_atual, bloco_dir);
+        return busca_diretorio_pai(SA, dir_atual, nome_atual, bloco_dir);
     }
     else
     {
@@ -495,7 +502,7 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
         if (bloco_dir == -1)
         {
             fprintf(stderr, "%s não foi encontrado em %s\n", dir_aux, dir_atual);
-            volta_pro_root(SA);
+            //volta_pro_root(SA);
             return -1;
         }
         fseek(SA, TAMANHO_BLOCO * bloco_dir, SEEK_SET);
@@ -508,7 +515,7 @@ int busca_diretorio(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
         }
         aux[j] = '\0';
         nome_atual = aux;
-        return busca_diretorio(SA, dir_aux, nome_atual, bloco_dir);
+        return busca_diretorio_pai(SA, dir_aux, nome_atual, bloco_dir);
     }
 }
 
@@ -523,6 +530,11 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
         volta_pro_root(SA);
         cont += TAMANHO_METADADOS_ROOT;
     }
+    else
+    {
+        fseek(SA, bloco_dir*TAMANHO_BLOCO, SEEK_SET);
+    }
+    
 
     char nome_lido[255];
 
@@ -580,11 +592,11 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
     }
 }
 
-
+//Esta função apaga os metadados de um arquivo de seu diretorio pai e então apaga seus dados do sistema de arquivos
 void remove_arquivo(FILE *SA, char *nome)
 {
     int cont = 0, i = 0, tamanho_entrada;
-    int bloco_dir = busca_diretorio(SA, "/", nome, BLOCO_ROOT);
+    int bloco_dir = busca_diretorio_pai(SA, "/", nome, BLOCO_ROOT);
 
     if (bloco_dir == BLOCO_ROOT)
     {
@@ -679,7 +691,101 @@ void remove_arquivo(FILE *SA, char *nome)
         bloco_entrada = aux;
     } while (bloco_entrada != -1);
     
+}
 
+void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int primeira_chamada)
+{
+    int cont = 0, i = 0, tamanho_entrada, bloco_dir;
+    if (primeira_chamada)
+        bloco_diretorio_pai = busca_diretorio_pai(SA, "/", diretorio, BLOCO_ROOT);
+
+    char *dir_reduzido = remove_dirs_nome(diretorio);
+    bloco_dir = procura_nome_e_devolve_info(SA, dir_reduzido, 1, bloco_diretorio_pai);
+
+    //Ir para o bloco do diretorio e ler as entradas, ver se sao arquivos e apagá-las e ver se são diretorios e chamar a função de novo
+
+    if (bloco_dir == BLOCO_ROOT)
+    {
+        volta_pro_root(SA);
+        cont += TAMANHO_METADADOS_ROOT;
+    }
+    else
+    {
+        fseek(SA, bloco_dir*TAMANHO_BLOCO, SEEK_SET);
+    }
+
+    char nome_lido[255];
+    
+    while (1)
+    {
+        if (cont >= TAMANHO_BLOCO)
+            if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                return;
+        i=0;
+        while ((nome_lido[i] = fgetc(SA)) != '\0')
+        {
+            i++;
+            cont++;
+            //Não sei se deve ser == ou >
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                    break;
+        }
+        if (nome_lido[0] == '\0' || cont >= TAMANHO_BLOCO)
+            break;
+        cont++;
+        if (cont >= TAMANHO_BLOCO)
+            if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                break;
+        tamanho_entrada = atoi(nome_lido);
+        i = 0;
+        while ((nome_lido[i] = fgetc(SA)) != '\0')
+        {
+            i++;
+            cont++;
+            if (cont >= TAMANHO_BLOCO)
+                if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
+                    break;
+        }
+        if (cont >= TAMANHO_BLOCO) break;
+        cont++;
+        i = 0;
+        //Aqui já lemos o nome
+        fseek(SA, tamanho_entrada-(strlen(nome_lido)+1)-FAT_ENTRY-1, SEEK_CUR);
+        char fat_buf[6];
+        for (i = 0; i < FAT_ENTRY; i++) fat_buf[i] = fgetc(SA);
+        fat_buf[i] = '\0';
+        fgetc(SA); //Para passar o |
+        int bloco_entrada = atoi(fat_buf);
+
+        if (tamanho_entrada > calcula_tamanho_metadados(nome_lido, -1))
+        {
+            //Arquivo
+            do
+            {
+                bitmap[bloco_entrada] = LIVRE;
+                int aux = FAT[bloco_entrada];
+                FAT[bloco_entrada] = 0;
+                bloco_entrada = aux;
+            } while (bloco_entrada != -1);
+            fprintf(stderr, "%s/%s\n", dir_reduzido, nome_lido);
+        }
+        else
+        {
+            //Diretorio
+            int j;
+            int pos_anterior = ftell(SA);
+            remove_diretorio(SA, bloco_dir, nome_lido, 0);
+            fseek(SA, pos_anterior, SEEK_SET);
+            fprintf(stderr, "%s/%s\n", dir_reduzido, nome_lido);
+        }
+    }
+    if (primeira_chamada) //apagar metadados
+    {
+        remove_arquivo(SA, diretorio);
+        fprintf(stderr, "%s\n", diretorio);
+    }
+    
 }
 
 void lista_itens_diretorio(FILE *SA, char *nome)
@@ -693,7 +799,7 @@ void lista_itens_diretorio(FILE *SA, char *nome)
     strcat(buf, nome);
     if (strcmp(nome, "/") != 0)
         strcat(buf, "/a");
-    bloco_dir = busca_diretorio(SA, "/", buf, BLOCO_ROOT);
+    bloco_dir = busca_diretorio_pai(SA, "/", buf, BLOCO_ROOT);
 
     if (bloco_dir == BLOCO_ROOT)
     {
@@ -907,7 +1013,7 @@ void acabou_bloco(FILE *SA, int *bloco_dir)
 void imprime_arquivo(FILE *SA, char *nome)
 {
     int cont = 0, i = 0, tamanho_entrada;
-    int bloco_dir = busca_diretorio(SA, "/", nome, BLOCO_ROOT);
+    int bloco_dir = busca_diretorio_pai(SA, "/", nome, BLOCO_ROOT);
 
     if (bloco_dir == BLOCO_ROOT)
     {

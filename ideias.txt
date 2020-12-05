@@ -1,14 +1,21 @@
 X Criar arquivos (vazios com touch)
 X Copiar arquivos
 X Apagar arquivos
-Criar diretorios (mkdir)
+X Criar diretorios (mkdir)
 Apagar diretorios (rmdir)
 X Acessar arquivos (cat)
 X Ler diretorios (ls)
 Informações sobre o sistema de arquivos (df)
+Achar arquivo (find)
 
 Definir em definitivo formato das entradas:
     tamanhodaentrada\0nome\0(tamanho)tempo1tempo2tempo3FAT|
     tamanhodaentrada = strlen(nome)+1?+ndigitosTamanho+30+5+1
 
 Alterar seek_set + ftell por seek_cur
+
+Apagar diretorio: primeiro, encontrar o diretorio pai deste diretorio. Em seguida, pegar o bloco em que este diretorio está checar se tem mais diretorios dentro (se tiver, chama recursivamente), apaga os arquivos dentro do diretorio e apaga o diretorio
+1->acha diretorio
+2->Lê bloco deste diretorio
+3->Lê entradas nesse diretorio, se for arquivo, apaga as entradas FAT e bitmap, e se for diretorio, entra no diretorio e chama recursivamente essa função.
+4->Apaga o diretorio 
