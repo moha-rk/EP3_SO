@@ -12,4 +12,11 @@ Definir em definitivo formato das entradas:
     tamanhodaentrada\0nome\0(tamanho)tempo1tempo2tempo3FAT|
     tamanhodaentrada = strlen(nome)+1?+ndigitosTamanho+30+5+1
 
-df: imprime na tela as seguintes informacoes do sistema de arquivos: quantidade de diret ́orios,quantidade de arquivos, espac livre, espac desperdicado (considerando o espac ̧o a mais ne-cess ́ario para cada arquivo ocupar exatamente m ́ultiplos do tamanho de 1 bloco)
+Atualização de tempos:
+
+touch X
+mkdir (pai) X
+rmdir (pai) X
+cat (acesso) X
+rm (pai) X
+cp (pai) X

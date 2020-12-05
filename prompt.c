@@ -4,6 +4,7 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include "filesystem.c"
 
 #define MAX_PARAMETERS 10
 #define MAX_PROMPT_SIZE 10
@@ -17,6 +18,7 @@ bool internal_commands(char *command, char **parameters);
 
 
 char *prompt = "[ep3]: ";
+FILE *SA = NULL;
 
 int main(int argc, char **argv)
 {
@@ -31,8 +33,8 @@ int main(int argc, char **argv)
 
 		read_command(&command, parameters);
 
-		if (internal_commands(command, parameters))
-			continue;
+		if (!internal_commands(command, parameters))
+			fprintf(stderr, "Comando não reconhecido\n");
 	}
 	return 0;
 }
@@ -65,80 +67,118 @@ bool internal_commands(char *command, char **parameters)
 	{
 		if (parameters[1] != NULL)
 			/*Monta sistema de arquivos*/
+			SA = mount(parameters[1]);
+		else
+			fprintf(stderr, "Chamada incorreta da função mount.\nChamada correta: mount arquivo\n");
 		return true;
 	}
     if (strcmp(command, "cp") == 0)
 	{
-		if (parameters[1] != NULL && parameters[2] != NULL)
+		if (parameters[1] != NULL && parameters[2] != NULL && SA != NULL)
 			/*copia de parameters[1] sera salva em parameters[2]*/
+			//add_arquivo(SA, parameters[1], parameters[2]);
+			cp(SA, parameters[1], parameters[2]);
+		else if (SA == NULL) fprintf(stderr, "Não há um sistema de arquivos montado\n");
+		else
+			fprintf(stderr, "Chamada incorreta da função cp.\nChamada correta: cp origem destino\n");
 		return true;
 	}
 	if (strcmp(command, "mkdir") == 0)
 	{
-		if (parameters[1] != NULL)
-            /*Nova função de mkdir no sistema de arquivos simulado*/
-			
+		if (parameters[1] != NULL && SA != NULL)
+			//add_arquivo_vazio(SA, parameters[1], -1);
+			mkdir(SA, parameters[1]);
+		else if (SA == NULL) fprintf(stderr, "Não há um sistema de arquivos montado\n");
+		else
+			fprintf(stderr, "Chamada incorreta da função mkdir.\nChamada correta: mkdir diretorio\n");
 		return true;
 	}
     if (strcmp(command, "rmdir") == 0)
 	{
-		if (parameters[1] != NULL)
-            /* apaga o diretorio parameters[1]. Se o diretorio nao estiver vazio, apaga tudo que estiver embaixo e avisa para o usuario tudo que tiver sido apagado*/
-			
+		if (parameters[1] != NULL && SA != NULL)
+			//remove_diretorio(SA, BLOCO_ROOT, parameters[1], 1);
+			rmdir(SA, parameters[1]);
+		else if (SA == NULL) fprintf(stderr, "Não há um sistema de arquivos montado\n");
+		else
+			fprintf(stderr, "Chamada incorreta da função rmdir.\nChamada correta: rmdir diretorio\n");
 		return true;
 	}
 	if (strcmp(command, "cat") == 0)
 	{
-		if (parameters[1] != NULL)
-			/* mostra o conteudo do arquivo parameters[1] na tela*/
+		if (parameters[1] != NULL && SA != NULL)
+			//imprime_arquivo(SA, parameters[1]);
+			cat(SA, parameters[1]);
+		else if (SA == NULL) fprintf(stderr, "Não há um sistema de arquivos montado\n");
+		else
+			fprintf(stderr, "Chamada incorreta da função cat.\nChamada correta: cat arquivo\n");
 		return true;
 	}
     if (strcmp(command, "touch") == 0)
 	{
-		if (parameters[1] != NULL)
-			/*se o arquivo parameters[1] existir, atualiza o instante de tempo de acesso para o
-            instante de tempo atual. Se nao existir, cria um arquivo vazio*/
+		//FALTA CHECAR SE O ARQUIVO EXISTE PARA DAR TOUCH
+		if (parameters[1] != NULL && SA != NULL)
+			//add_arquivo_vazio(SA, parameters[1], 0);
+			touch(SA, parameters[1]);
+		else if (SA == NULL) fprintf(stderr, "Não há um sistema de arquivos montado\n");
+		else
+			fprintf(stderr, "Chamada incorreta da função touch.\nChamada correta: touch arquivo\n");
 		return true;
 	}
     if (strcmp(command, "rm") == 0)
 	{
-		if (parameters[1] != NULL)
 			/*remove o arquivo parameters[1]*/
+		if (parameters[1] != NULL && SA != NULL)
+
+			rm(SA, parameters[1]);
+		else if (SA == NULL) fprintf(stderr, "Não há um sistema de arquivos montado\n");
+		else
+			fprintf(stderr, "Chamada incorreta da função touch.\nChamada correta: rm arquivo\n");
 		return true;
 	}
 	if (strcmp(command, "ls") == 0)
 	{
-		if (parameters[1] != NULL)
-			/* lista os arquivos e diretorios que estejam “embaixo” do diretorio parameters[1].
-            Na listagem que sera exibida, para todos os arquivos existentes, deverao ser exibidos: nome, tamanho em bytes e data de ultima modificaçao. Diretorios devem ser exibidos com alguma informaçao a mais que os diferencie como diretorios*/
+		if (parameters[1] != NULL && SA != NULL)
+			lista_itens_diretorio(SA, parameters[1]);
+		else if (SA == NULL) fprintf(stderr, "Não há um sistema de arquivos montado\n");
+		else
+			fprintf(stderr, "Chamada incorreta da função ls.\nChamada correta: ls diretorio\n");
 		return true;
 	}
     if (strcmp(command, "find") == 0)
 	{
-		if (parameters[1] != NULL && parameters[2] != NULL)
-			/*busca a partir de parameters[1] se ha algum arquivo com nome
-            parameters[2]. Todos os arquivos encontrados devem ser exibidos na tela com os seus caminhos
-            completos (apenas o nome dos arquivos, nao o conte ˜ udo)*/
+		if (parameters[1] != NULL && parameters[2] && SA != NULL)
+			find(SA, parameters[1], parameters[2], 1, BLOCO_ROOT, "/");
+		else if (SA == NULL) fprintf(stderr, "Não há um sistema de arquivos montado\n");
+		else
+			fprintf(stderr, "Chamada incorreta da função find.\nChamada correta: find diretorio arquivo\n");
 		return true;
 	}
     if (strcmp(command, "df") == 0)
 	{
-		/*imprime na tela as seguintes informaçoes do sistema de arquivos: quantidade de diretorios, ´
-        quantidade de arquivos, espaço livre, espaço desperdiçado (considerando o espaço a mais necessario para cada arquivo ocupar exatamente multiplos do tamanho de 1 bloco)*/
+		int a = 0, b = 0;
+    	df(SA, BLOCO_ROOT, &a, &b, 1);
 		return true;
 	}
 	if (strcmp(command, "umount") == 0)
 	{
-		/*desmonta sistema de arquivos*/
+		fprintf(stderr, "Desmontando o sistema de arquivos\n");
+		fclose(SA);
+		SA = NULL;
 		return true;
 	}
     if (strcmp(command, "sai") == 0)
 	{
 		/*sai do simulador*/
 		//Provavelmente vai ser um exit(0)
-        exit(EXIT_SUCCESS);
+		if (SA != NULL)
+		{
+			fprintf(stderr, "Desmontando o sistema de arquivos\n");
+			fclose(SA);
+			SA = NULL;
+		}
         free(command);
 	    clear_history();
+		exit(EXIT_SUCCESS);
 	}
 	return false;
 }

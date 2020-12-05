@@ -40,6 +40,7 @@ int busca_espaco_metadados(FILE *SA, int dir, int tam_metadados, int *primeiro, 
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
 void remove_arquivo(FILE *SA, char *nome);
 void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int primeira_chamada);
+void atualiza_tempos(FILE *SA, char *dir_pai);
 
 int cria_diretorio(FILE *SA, char *nome_origem);
 void lista_itens_diretorio(FILE *SA, char *nome);
@@ -48,6 +49,7 @@ int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_d
 int espaco_restante_diretorio(FILE *SA, int *bloco_dir);
 int espaco_restante_bloco(FILE *SA, int bloco_dir);
 char *remove_dirs_nome(char *nome);
+char *nome_dir_pai(char *nome);
 
 void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco_diretorio_pai, char *dir_pai);
 void df(FILE *SA, int bloco_dir_atual, int *ndirs, int *narquivos, int primeira_chamada);
@@ -62,101 +64,6 @@ void imprime_arquivo(FILE *SA, char *nome);
 
 time_t rawtime;
 time_t currtime;
-
-int main(int argc, char **argv)
-{
-    FILE *SA = mount("abc.txt");
-
-    fseek(SA, BLOCO_ROOT*TAMANHO_BLOCO + TAMANHO_METADADOS_ROOT, SEEK_SET);
-    fputs("39", SA);
-    fputc('\0', SA);
-    fputs("d1", SA);
-    fputc('\0', SA);
-    fputs("12345678901234567890123456789000330|", SA);
-    long aux = ftell(SA);
-    aloca_bloco(SA, 330);
-    fseek(SA, aux, SEEK_SET);
-
-    fputs("47", SA);
-    fputc('\0', SA);
-    fputs("arq.txt", SA); //root
-    fputc('\0', SA);
-    fputs("12312345678901234567890123456789000425|", SA);
-    aux = ftell(SA);
-    aloca_bloco(SA, 425);
-    fseek(SA, aux, SEEK_SET);
-
-    fseek(SA, TAMANHO_BLOCO*330, SEEK_SET);
-
-    fputs("39", SA);
-    fputc('\0', SA);
-    fputs("d2", SA);
-    fputc('\0', SA);
-    fputs("12345678901234567890123456789000322|", SA);
-    aux = ftell(SA);
-    aloca_bloco(SA, 322);
-    fseek(SA, aux, SEEK_SET);
-    fputs("39", SA);
-    fputc('\0', SA);
-    fputs("d3", SA);
-    fputc('\0', SA);
-    fputs("12345678901234567890123456789000323|", SA);
-    aux = ftell(SA);
-    aloca_bloco(SA, 323);
-    fseek(SA, aux, SEEK_SET);
-    fputs("47", SA);
-    fputc('\0', SA);
-    fputs("arq.txt", SA); //d1
-    fputc('\0', SA);
-    fputs("12312345678901234567890123456789000325|", SA);
-    aux = ftell(SA);
-    aloca_bloco(SA, 325);
-    fseek(SA, aux, SEEK_SET);
-    //printf ("\n%d\n", procura_nome_e_devolve_info(SA, "d1", 1, BLOCO_ROOT));
-    //lista_itens_diretorio(SA, "/d1");
-    //remove_arquivo(SA, "/d1/arq.txt");
-    //remove_arquivo(SA, "/d1/d2");
-    //lista_itens_diretorio(SA, "/d1");
-    //lista_itens_diretorio(SA, "/");
-    //add_arquivo_vazio(SA, "/teste1.txt", 0);
-    //add_arquivo_vazio(SA, "/d5", -1);
-
-    //d3
-    fseek(SA, TAMANHO_BLOCO*323, SEEK_SET);
-
-    fputs("47", SA);
-    fputc('\0', SA);
-    fputs("arq.txt", SA);
-    fputc('\0', SA);
-    fputs("12312345678901234567890123456789000125|", SA);
-    aux = ftell(SA);
-    aloca_bloco(SA, 125);
-    fseek(SA, aux, SEEK_SET);
-
-    lista_itens_diretorio(SA, "/d1");
-    lista_itens_diretorio(SA, "/");
-
-    find(SA, "/", "arq.txt", 1, BLOCO_ROOT, "/");
-
-    //fprintf(stderr, "*************CHAMADA DA FUNÇÂO DE REMOÇÂO****************\n");
-    //remove_diretorio(SA, BLOCO_ROOT, "/d1", 1);
-    //fprintf(stderr, "*************FIM CHAMADA DA FUNÇÂO DE REMOÇÂO****************\n");
-
-    int a = 0, b = 0;
-    df(SA, BLOCO_ROOT, &a, &b, 1);
-
-
-    //lista_itens_diretorio(SA, "/");
-    
-    //char *a = "/d1/arquivo.txt";
-    //add_arquivo(SA, "ideias.txt", "/arquivo.txt");
-    //imprime_arquivo(SA, "/arquivo.txt");
-    //printf ("\n%d\n", busca_diretorio_pai(SA, "/", a, BLOCO_ROOT));
-    //printf("%s", a);
-
-    fclose(SA);
-    return 0;
-}
 
 //Retorno da função a ser definido, podendo ser um ponteiro FILE
 FILE *mount(char *nome_arquivo)
@@ -177,7 +84,7 @@ FILE *mount(char *nome_arquivo)
         fprintf(stderr, "Acesso ao arquivo %s negado\n", nome_arquivo);
         return NULL;
     }
-    printf("criou arquivo");
+    printf("Criando sistema de arquivos...\n");
     cria_FAT(f);
     cria_bitmap(f);
     cria_root(f);
@@ -497,6 +404,22 @@ char *remove_dirs_nome(char *nome)
     return aux;
 }
 
+char *nome_dir_pai(char *nome)
+{
+    int i, j = 0;
+    char *aux;
+    aux = malloc(strlen(nome) * sizeof(char));
+    for (i = strlen(nome)-1; i >= 0; i--)
+    {
+        if (nome[i] == '/') break;
+    }
+    aux[0] = '/';
+    for (j = 1; j < i; j++)
+        aux[j] = nome[j];
+    aux[j] = '\0';
+    return aux;
+}
+
 //dir_atual deve ser chamado com "/" e bloco_dir com o bloco do root
 //Devo alimentar a função com um caminho contendo o nome do arquivo no final?
 //entradas serão do tipo "/tmp/d1/arquivo.txt" ou "/tmp/d1"?
@@ -565,11 +488,8 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
         cont += TAMANHO_METADADOS_ROOT;
     }
     else
-    {
         fseek(SA, bloco_dir*TAMANHO_BLOCO, SEEK_SET);
-    }
     
-
     char nome_lido[255];
 
     while (strcmp(nome_lido, nome) != 0)
@@ -617,12 +537,17 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
     //Depois adiciono mais infos para devolver, por enquanto devolverei apenas o diretorio FAT
     if (info == 1) //Numero generico
     {
-        fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1) - FAT_ENTRY, SEEK_CUR);
+        fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1) - FAT_ENTRY - 1, SEEK_CUR);
 
         for (i = 0; i < 5; i++)
             nome_lido[i] = fgetc(SA);
         nome_lido[i] = '\0';
         return atoi(nome_lido); //FAT
+    }
+    else if (info == 2) //Função que serve para posicionar SA no inicio do tempo de acesso (tempo2)
+    {
+        fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1) - (FAT_ENTRY+1+2*TAMANHO_TIME), SEEK_CUR);
+        return 1;
     }
 }
 
@@ -1023,13 +948,13 @@ void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int pr
             int pos_anterior = ftell(SA);
             remove_diretorio(SA, bloco_dir, nome_lido, 0);
             fseek(SA, pos_anterior, SEEK_SET);
-            fprintf(stderr, "%s/%s\n", dir_reduzido, nome_lido);
+            fprintf(stderr, "%s/%s/\n", dir_reduzido, nome_lido);
         }
     }
     if (primeira_chamada) //apagar metadados
     {
         remove_arquivo(SA, diretorio);
-        fprintf(stderr, "%s\n", diretorio);
+        fprintf(stderr, "%s/\n", diretorio);
     }
     
 }
@@ -1269,7 +1194,6 @@ void imprime_arquivo(FILE *SA, char *nome)
 
     char nome_lido[255], c;
     nome = remove_dirs_nome(nome);
-    fprintf(stderr, "nome = %s\n", nome);
 
     while (strcmp(nome_lido, nome) != 0)
     {
@@ -1332,6 +1256,87 @@ void imprime_arquivo(FILE *SA, char *nome)
         bloco_entrada = FAT[bloco_entrada];
     } while (bloco_entrada != -1);
     fprintf(stderr, "\n");
+}
+
+void touch(FILE* SA, char *nome)
+{
+    int bloco_dir_pai = busca_diretorio_pai(SA, "/", nome, BLOCO_ROOT);
+    char *dir_reduzido = remove_dirs_nome(nome);
+    int t = procura_nome_e_devolve_info(SA, dir_reduzido, 2, bloco_dir_pai);
+    if (t == -1)
+        add_arquivo_vazio(SA, nome, 0);
+        //Caso arquivo não exista
+	else
+    {
+        //Aqui, SA aponta para o primeiro byte de tempo de acesso
+        time(&rawtime);
+        fprintf(SA, "%ld", rawtime);
+        fprintf(SA, "%ld", rawtime);
+    }
+    free(dir_reduzido);
+}
+
+void mkdir(FILE *SA, char *nome)
+{
+    char *dir_pai = nome_dir_pai(nome);
+    add_arquivo_vazio(SA, nome, -1);
+    atualiza_tempos(SA, dir_pai);
+    free(dir_pai);
+}
+
+void rmdir(FILE *SA, char *nome)
+{
+    char *dir_pai = nome_dir_pai(nome);
+    remove_diretorio(SA, BLOCO_ROOT, nome, 1);
+    atualiza_tempos(SA, dir_pai);
+    free(dir_pai);
+}
+
+void cat(FILE *SA, char *nome)
+{
+	imprime_arquivo(SA, nome);
+    atualiza_tempos(SA, nome);
+}
+
+void cp(FILE *SA, char *nome_origem, char *nome_destino)
+{
+    char *dir_pai = nome_dir_pai(nome_destino);
+    add_arquivo(SA, nome_origem, nome_destino);
+    atualiza_tempos(SA, dir_pai);
+    free(dir_pai);
+}
+
+void rm(FILE *SA, char *nome)
+{
+    char *dir_pai = nome_dir_pai(nome);
+    remove_arquivo(SA, nome);
+    atualiza_tempos(SA, dir_pai);
+    free(dir_pai);
+}
+
+void atualiza_tempos(FILE *SA, char *dir_pai)
+{
+    int bloco_dir_avo = busca_diretorio_pai(SA, "/", dir_pai, BLOCO_ROOT);
+    char *dir_reduzido = remove_dirs_nome(dir_pai);
+    int t = procura_nome_e_devolve_info(SA, dir_reduzido, 2, bloco_dir_avo);
+    if (t != -1)
+    {
+        //Aqui, SA aponta para o primeiro byte de tempo de acesso
+        time(&rawtime);
+        fprintf(SA, "%ld", rawtime);
+        fprintf(SA, "%ld", rawtime);
+    }
+    else if(bloco_dir_avo == BLOCO_ROOT)
+    {
+        time(&rawtime);
+        fseek(SA, BLOCO_ROOT*TAMANHO_BLOCO+1, SEEK_SET);
+        fprintf(SA, "%ld ", rawtime);
+        fprintf(SA, "%ld", rawtime);
+    }
+    else
+    {
+        fprintf(stderr, "O diretório %s não foi encontrado\n", dir_pai);
+    }
 }
 
 int digitos(int n)
