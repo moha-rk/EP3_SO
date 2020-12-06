@@ -20,6 +20,9 @@
 #define LIVRE '1'
 #define OCUPADO '0'
 
+#define GETFAT 1
+#define SETPOSITIONTOTIME 2
+
 int FAT[N_BLOCOS];
 char bitmap[N_BLOCOS];
 

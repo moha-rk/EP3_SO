@@ -77,7 +77,6 @@ bool internal_commands(char *command, char **parameters)
 	{
 		if (parameters[1] != NULL && parameters[2] != NULL && SA != NULL)
 			/*copia de parameters[1] sera salva em parameters[2]*/
-			//add_arquivo(SA, parameters[1], parameters[2]);
 			cp(SA, parameters[1], parameters[2]);
 		else if (SA == NULL)
 			fprintf(stderr, "Não há um sistema de arquivos montado\n");
@@ -88,7 +87,6 @@ bool internal_commands(char *command, char **parameters)
 	if (strcmp(command, "mkdir") == 0)
 	{
 		if (parameters[1] != NULL && SA != NULL)
-			//add_arquivo_vazio(SA, parameters[1], -1);
 			mkdir(SA, parameters[1]);
 		else if (SA == NULL)
 			fprintf(stderr, "Não há um sistema de arquivos montado\n");
@@ -99,7 +97,6 @@ bool internal_commands(char *command, char **parameters)
 	if (strcmp(command, "rmdir") == 0)
 	{
 		if (parameters[1] != NULL && SA != NULL)
-			//remove_diretorio(SA, BLOCO_ROOT, parameters[1], 1);
 			rmdir(SA, parameters[1]);
 		else if (SA == NULL)
 			fprintf(stderr, "Não há um sistema de arquivos montado\n");
@@ -110,7 +107,6 @@ bool internal_commands(char *command, char **parameters)
 	if (strcmp(command, "cat") == 0)
 	{
 		if (parameters[1] != NULL && SA != NULL)
-			//imprime_arquivo(SA, parameters[1]);
 			cat(SA, parameters[1]);
 		else if (SA == NULL)
 			fprintf(stderr, "Não há um sistema de arquivos montado\n");
@@ -122,7 +118,6 @@ bool internal_commands(char *command, char **parameters)
 	{
 		//FALTA CHECAR SE O ARQUIVO EXISTE PARA DAR TOUCH
 		if (parameters[1] != NULL && SA != NULL)
-			//add_arquivo_vazio(SA, parameters[1], 0);
 			touch(SA, parameters[1]);
 		else if (SA == NULL)
 			fprintf(stderr, "Não há um sistema de arquivos montado\n");
@@ -134,7 +129,6 @@ bool internal_commands(char *command, char **parameters)
 	{
 		/*remove o arquivo parameters[1]*/
 		if (parameters[1] != NULL && SA != NULL)
-
 			rm(SA, parameters[1]);
 		else if (SA == NULL)
 			fprintf(stderr, "Não há um sistema de arquivos montado\n");
@@ -178,7 +172,6 @@ bool internal_commands(char *command, char **parameters)
 	if (strcmp(command, "sai") == 0)
 	{
 		/*sai do simulador*/
-		//Provavelmente vai ser um exit(0)
 		if (SA != NULL)
 		{
 			fprintf(stderr, "Desmontando o sistema de arquivos\n");

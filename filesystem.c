@@ -387,7 +387,7 @@ int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_d
     else
     {
         //Preciso mexer *SA para o bloco de dir_aux antes de chamar a função novamente
-        bloco_dir = procura_nome_e_devolve_info(SA, dir_aux, 1, bloco_dir);
+        bloco_dir = procura_nome_e_devolve_info(SA, dir_aux, GETFAT, bloco_dir);
         if (bloco_dir == -1)
         {
             fprintf(stderr, "%s não foi encontrado em %s\n", dir_aux, dir_atual);
@@ -608,7 +608,7 @@ void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco
     else
     {
         char *dir_reduzido = remove_dirs_nome(diretorio);
-        bloco_dir = procura_nome_e_devolve_info(SA, dir_reduzido, 1, bloco_diretorio_pai);
+        bloco_dir = procura_nome_e_devolve_info(SA, dir_reduzido, GETFAT, bloco_diretorio_pai);
     }
 
     //Ir para o bloco do diretorio e ler as entradas, ver se sao arquivos e apagá-las e ver se são diretorios e chamar a função de novo
@@ -823,7 +823,7 @@ void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int pr
         bloco_diretorio_pai = busca_diretorio_pai(SA, "/", diretorio, BLOCO_ROOT);
 
     char *dir_reduzido = remove_dirs_nome(diretorio);
-    bloco_dir = procura_nome_e_devolve_info(SA, dir_reduzido, 1, bloco_diretorio_pai);
+    bloco_dir = procura_nome_e_devolve_info(SA, dir_reduzido, GETFAT, bloco_diretorio_pai);
 
     //Ir para o bloco do diretorio e ler as entradas, ver se sao arquivos e apagá-las e ver se são diretorios e chamar a função de novo
 
@@ -1240,7 +1240,7 @@ void atualiza_tempos(FILE *SA, char *dir_pai)
 {
     int bloco_dir_avo = busca_diretorio_pai(SA, "/", dir_pai, BLOCO_ROOT);
     char *dir_reduzido = remove_dirs_nome(dir_pai);
-    int t = procura_nome_e_devolve_info(SA, dir_reduzido, 2, bloco_dir_avo);
+    int t = procura_nome_e_devolve_info(SA, dir_reduzido, SETPOSITIONTOTIME, bloco_dir_avo);
     if (t != -1)
     {
         //Aqui, SA aponta para o primeiro byte de tempo de acesso
