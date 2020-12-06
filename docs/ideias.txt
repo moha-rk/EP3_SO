@@ -1,0 +1,22 @@
+X Criar arquivos (vazios com touch)
+X Copiar arquivos
+X Apagar arquivos
+X Criar diretorios (mkdir)
+X Apagar diretorios (rmdir)
+X Acessar arquivos (cat)
+X Ler diretorios (ls)
+Informações sobre o sistema de arquivos (df)
+X Achar arquivo (find)
+
+Definir em definitivo formato das entradas:
+    tamanhodaentrada\0nome\0(tamanho)tempo1tempo2tempo3FAT|
+    tamanhodaentrada = strlen(nome)+1?+ndigitosTamanho+30+5+1
+
+Atualização de tempos:
+
+touch X
+mkdir (pai) X
+rmdir (pai) X
+cat (acesso) X
+rm (pai) X
+cp (pai) X
