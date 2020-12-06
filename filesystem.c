@@ -922,6 +922,10 @@ void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int pr
             int j;
             int pos_anterior = ftell(SA);
             remove_diretorio(SA, bloco_dir, nome_lido, 0);
+            do
+            {
+                bloco_entrada = limpa_bloco(SA, bloco_entrada);
+            } while (bloco_entrada != -1);
             fseek(SA, pos_anterior, SEEK_SET);
             fprintf(stderr, "%s/%s/\n", dir_reduzido, nome_lido);
         }
