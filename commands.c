@@ -25,9 +25,11 @@ void touch(FILE *SA, char *nome)
 
 void mkdir(FILE *SA, char *nome)
 {
+    //fprintf(stderr, "nome = %s\n", nome);
     char *dir_pai = nome_dir_pai(nome);
+    //fprintf(stderr, "dirpai = %s\n", dir_pai);
     add_arquivo_vazio(SA, nome, -1);
-    atualiza_tempos(SA, dir_pai);
+    atualiza_tempos(SA, nome);
     free(dir_pai);
 }
 

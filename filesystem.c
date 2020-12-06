@@ -217,7 +217,7 @@ int add_arquivo_vazio(FILE *SA, char *nome, int tamanho)
     char *diretorio_atual = "/";
     blocos_arquivo = 1;
 
-    int cont = 0, primeiro, segundo;
+    int cont = 0, primeiro, segundo = -1;
     for (int i = BLOCO_ROOT; i < N_BLOCOS; i++)
     {
         if (bitmap[i] == LIVRE)
@@ -423,6 +423,7 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
         fseek(SA, bloco_dir * TAMANHO_BLOCO, SEEK_SET);
 
     char nome_lido[255];
+    nome_lido[0] = '\0';
 
     while (strcmp(nome_lido, nome) != 0)
     {
@@ -627,7 +628,7 @@ void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco
             if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
                 return;
         //Aqui, nome_lido contém o nome errado e SA aponta para o primeiro caracter após \0
-
+        i = 0;
         while ((nome_lido[i] = fgetc(SA)) != '\0')
         {
             i++;
@@ -637,7 +638,6 @@ void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco
                 if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
                     return;
         }
-        //fprintf(stderr, "nomelido=%s\n", nome_lido);
         if (nome_lido[0] == '\0')
             return;
         cont++;
@@ -654,6 +654,7 @@ void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco
                 if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
                     return;
         }
+        
         cont++;
         i = 0;
         cont += tamanho_entrada - (strlen(nome_lido) + 1);
@@ -664,20 +665,25 @@ void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco
             char dir_aux[250];
             dir_aux[0] = '\0';
             strcat(dir_aux, dir_pai);
-            strcat(dir_aux, diretorio);
+            if (strcmp(diretorio, "/") != 0)
+            {   
+                strcat(dir_aux, "/");
+                strcat(dir_aux, diretorio);
+            }
             int pos_atual = ftell(SA);
             find(SA, nome_lido, nome, 0, bloco_dir, dir_aux);
             fseek(SA, pos_atual, SEEK_SET);
         }
         if (strcmp(nome_lido, nome) == 0)
         {
-            //if (strcmp(dir_pai, "/") != 0)
-            if (strcmp(dir_pai, "") == 0)
-                fprintf(stderr, "%s%s\n", diretorio, nome);
-            else if (strcmp(dir_pai, "/") == 0)
-                fprintf(stderr, "%s%s/%s\n", dir_pai, diretorio, nome);
-            else
+            //if (strcmp(dir_pai, diretorio) == 0) 
+            //    fprintf(stderr, "%s%s\n", diretorio, nome);
+            //else
+            //    fprintf(stderr, "%s/%s/%s\n", dir_pai, diretorio, nome);
+            if (strcmp(diretorio, "/") != 0)
                 fprintf(stderr, "%s/%s/%s\n", dir_pai, diretorio, nome);
+            else
+                fprintf(stderr, "/%s\n", nome);
         }
 
         fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1), SEEK_CUR);
@@ -699,6 +705,7 @@ void remove_arquivo(FILE *SA, char *nome)
 
     char nome_lido[255], c;
     nome = remove_dirs_nome(nome);
+    nome_lido[0] = '\0';
 
     while (strcmp(nome_lido, nome) != 0)
     {
@@ -1161,6 +1168,8 @@ void imprime_arquivo(FILE *SA, char *nome)
 
     char nome_lido[255], c;
     nome = remove_dirs_nome(nome);
+    nome_lido[0] = '\0';
+
 
     while (strcmp(nome_lido, nome) != 0)
     {
@@ -1247,9 +1256,9 @@ void imprime_arquivo(FILE *SA, char *nome)
 
 void atualiza_tempos(FILE *SA, char *dir_pai)
 {
-    int bloco_dir_avo = busca_diretorio_pai(SA, "/", dir_pai, BLOCO_ROOT);
+    int bloco_dir_pai = busca_diretorio_pai(SA, "/", dir_pai, BLOCO_ROOT);
     char *dir_reduzido = remove_dirs_nome(dir_pai);
-    int t = procura_nome_e_devolve_info(SA, dir_reduzido, SETPOSITIONTOTIME, bloco_dir_avo);
+    int t = procura_nome_e_devolve_info(SA, dir_reduzido, SETPOSITIONTOTIME, bloco_dir_pai);
     if (t != -1)
     {
         //Aqui, SA aponta para o primeiro byte de tempo de acesso
@@ -1257,7 +1266,7 @@ void atualiza_tempos(FILE *SA, char *dir_pai)
         fprintf(SA, "%ld", rawtime);
         fprintf(SA, "%ld", rawtime);
     }
-    else if (bloco_dir_avo == BLOCO_ROOT)
+    else if (bloco_dir_pai == BLOCO_ROOT)
     {
         time(&rawtime);
         fseek(SA, BLOCO_ROOT * TAMANHO_BLOCO + 1, SEEK_SET);
