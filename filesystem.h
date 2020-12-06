@@ -4,8 +4,8 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef FILESYSTEM.H
-#define FILESYSTEM .H
+#ifndef FILESYSTEM_H
+#define FILESYSTEM_H
 
 #define N_BLOCOS 25000
 #define TAMANHO_BLOCO 4000
@@ -37,6 +37,7 @@ void volta_pro_root(FILE *f);
 void preenche_bloco_vazio(FILE *f, int n_bloco, int offset);
 void aloca_bloco(FILE *SA, int dir1);
 void estende_bloco(FILE *SA, int dir1, int dir2);
+int limpa_bloco(FILE *SA, int bloco);
 
 int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino);
 int add_arquivo_vazio(FILE *SA, char *nome_destino, int tamanho);

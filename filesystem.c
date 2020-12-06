@@ -806,14 +806,25 @@ void remove_arquivo(FILE *SA, char *nome)
         }
     }
     free(nome);
-
     do
     {
-        bitmap[bloco_entrada] = LIVRE;
-        int aux = FAT[bloco_entrada];
-        FAT[bloco_entrada] = 0;
-        bloco_entrada = aux;
+        bloco_entrada = limpa_bloco(SA, bloco_entrada);
     } while (bloco_entrada != -1);
+}
+
+int limpa_bloco(FILE *SA, int bloco)
+{
+    long pos_anterior = ftell(SA);
+    bitmap[bloco] = LIVRE;
+    fseek(SA, (TAMANHO_BLOCO * BLOCOS_FAT) + bloco, SEEK_SET);
+    fputc(LIVRE, SA);
+
+    int aux = FAT[bloco];
+    FAT[bloco] = 0;
+    fseek(SA, bloco*FAT_ENTRY, SEEK_SET);
+    fprintf(SA, "%05d", FAT[bloco]);
+    fseek(SA, pos_anterior, SEEK_SET);
+    return aux;
 }
 
 void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int primeira_chamada)
@@ -894,10 +905,7 @@ void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int pr
             //Arquivo
             do
             {
-                bitmap[bloco_entrada] = LIVRE;
-                int aux = FAT[bloco_entrada];
-                FAT[bloco_entrada] = 0;
-                bloco_entrada = aux;
+                bloco_entrada = limpa_bloco(SA, bloco_entrada);
             } while (bloco_entrada != -1);
             fprintf(stderr, "%s/%s\n", dir_reduzido, nome_lido);
         }
