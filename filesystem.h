@@ -44,8 +44,8 @@ int add_arquivo_vazio(FILE *SA, char *nome_destino, int tamanho);
 int busca_espaco_metadados(FILE *SA, int dir, int tam_metadados, int *primeiro, int segundo, int blocos_arquivo);
 
 int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir);
-void remove_arquivo(FILE *SA, char *nome);
-void remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int primeira_chamada);
+int remove_arquivo(FILE *SA, char *nome);
+int remove_diretorio(FILE *SA, int bloco_diretorio_pai, char *diretorio, int primeira_chamada);
 void atualiza_tempos(FILE *SA, char *dir_pai);
 
 void lista_itens_diretorio(FILE *SA, char *nome);
@@ -53,8 +53,8 @@ int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont);
 int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir);
 int espaco_restante_diretorio(FILE *SA, int *bloco_dir);
 int espaco_restante_bloco(FILE *SA, int bloco_dir);
-char *remove_dirs_nome(char *nome);
-char *nome_dir_pai(char *nome);
+void remove_dirs_nome(char *nome);
+void nome_dir_pai(char *nome);
 
 void find(FILE *SA, char *diretorio, char *nome, int primeira_chamada, int bloco_diretorio_pai, char *dir_pai);
 void df(FILE *SA, int bloco_dir_atual, int *ndirs, int *narquivos, int primeira_chamada);

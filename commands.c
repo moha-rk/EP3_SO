@@ -8,7 +8,9 @@
 void touch(FILE *SA, char *nome)
 {
     int bloco_dir_pai = busca_diretorio_pai(SA, "/", nome, BLOCO_ROOT);
-    char *dir_reduzido = remove_dirs_nome(nome);
+    char dir_reduzido[255];
+    strcpy(dir_reduzido, nome);
+    remove_dirs_nome(dir_reduzido);
     int t = procura_nome_e_devolve_info(SA, dir_reduzido, 2, bloco_dir_pai);
     if (t == -1)
         add_arquivo_vazio(SA, nome, 0);
@@ -20,25 +22,25 @@ void touch(FILE *SA, char *nome)
         fprintf(SA, "%ld", rawtime);
         fprintf(SA, "%ld", rawtime);
     }
-    free(dir_reduzido);
 }
 
 void mkdir(FILE *SA, char *nome)
 {
-    //fprintf(stderr, "nome = %s\n", nome);
-    char *dir_pai = nome_dir_pai(nome);
-    //fprintf(stderr, "dirpai = %s\n", dir_pai);
-    add_arquivo_vazio(SA, nome, -1);
-    atualiza_tempos(SA, nome);
-    free(dir_pai);
+    char dir_pai[255];
+    strcpy(dir_pai, nome);
+    nome_dir_pai(dir_pai);
+    if (add_arquivo_vazio(SA, nome, -1) != -1)
+        atualiza_tempos(SA, nome);
 }
 
 void rmdir(FILE *SA, char *nome)
 {
-    char *dir_pai = nome_dir_pai(nome);
-    remove_diretorio(SA, BLOCO_ROOT, nome, 1);
-    atualiza_tempos(SA, dir_pai);
-    free(dir_pai);
+    char dir_pai[255];
+    strcpy(dir_pai, nome);
+    nome_dir_pai(dir_pai);
+    fprintf(stderr, "Os seguintes arquivos foram apagados:\n");
+    if (remove_diretorio(SA, BLOCO_ROOT, nome, 1) != -1)
+        atualiza_tempos(SA, dir_pai);
 }
 
 void cat(FILE *SA, char *nome)
@@ -49,16 +51,18 @@ void cat(FILE *SA, char *nome)
 
 void cp(FILE *SA, char *nome_origem, char *nome_destino)
 {
-    char *dir_pai = nome_dir_pai(nome_destino);
+    char dir_pai[255];
+    strcpy(dir_pai, nome_destino);
+    nome_dir_pai(dir_pai);
     add_arquivo(SA, nome_origem, nome_destino);
     atualiza_tempos(SA, dir_pai);
-    free(dir_pai);
 }
 
 void rm(FILE *SA, char *nome)
 {
-    char *dir_pai = nome_dir_pai(nome);
-    remove_arquivo(SA, nome);
-    atualiza_tempos(SA, dir_pai);
-    free(dir_pai);
+    char dir_pai[255];
+    strcpy(dir_pai, nome);
+    nome_dir_pai(dir_pai);
+    if (remove_arquivo(SA, nome) != -1)
+        atualiza_tempos(SA, dir_pai);
 }
