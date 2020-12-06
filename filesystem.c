@@ -1240,6 +1240,7 @@ void imprime_arquivo(FILE *SA, char *nome)
         for (i = 0; i < TAMANHO_BLOCO && ((aux = fgetc(SA)) != '\0'); i++)
             fprintf(stderr, "%c", aux);
         bloco_entrada = FAT[bloco_entrada];
+        fseek(SA, bloco_entrada * TAMANHO_BLOCO, SEEK_SET);
     } while (bloco_entrada != -1);
     fprintf(stderr, "\n");
 }
