@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
-#include "filesystem.h"
+#include "../lib/filesystem.h"
 
 //Retorno da função a ser definido, podendo ser um ponteiro FILE
 FILE *mount(char *nome_arquivo)

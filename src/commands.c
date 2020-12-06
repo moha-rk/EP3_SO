@@ -3,7 +3,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
-#include "filesystem.h"
+#include "../lib/commands.h"
+#include "../lib/filesystem.h"
 
 void touch(FILE *SA, char *nome)
 {

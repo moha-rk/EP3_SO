@@ -4,9 +4,8 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
-#include "filesystem.h"
-#include "filesystem.c"
-#include "commands.c"
+#include "../lib/filesystem.h"
+#include "../lib/commands.h"
 
 #define MAX_PARAMETERS 10
 #define MAX_PROMPT_SIZE 10
