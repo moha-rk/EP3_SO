@@ -64,7 +64,7 @@ void acabou_bloco(FILE *SA, int *bloco_dir);
 int calcula_tamanho_metadados(char *nome, int tamanho);
 int digitos(int n);
 
-void imprime_arquivo(FILE *SA, char *nome);
+int imprime_arquivo(FILE *SA, char *nome);
 
 time_t rawtime;
 time_t currtime;

@@ -45,8 +45,9 @@ void rmdir(FILE *SA, char *nome)
 
 void cat(FILE *SA, char *nome)
 {
-    imprime_arquivo(SA, nome);
-    atualiza_tempos(SA, nome);
+    if (imprime_arquivo(SA, nome) == -1) fprintf(stderr, "%s não foi encontrado\n", nome);
+
+    else atualiza_tempos(SA, nome);
 }
 
 void cp(FILE *SA, char *nome_origem, char *nome_destino)

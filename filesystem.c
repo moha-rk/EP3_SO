@@ -1175,7 +1175,7 @@ void acabou_bloco(FILE *SA, int *bloco_dir)
 }
 
 //Função para ser usada com cat
-void imprime_arquivo(FILE *SA, char *nome)
+int imprime_arquivo(FILE *SA, char *nome)
 {
     int cont = 0, i = 0, tamanho_entrada;
     int bloco_dir = busca_diretorio_pai(SA, "/", nome, BLOCO_ROOT);
@@ -1184,6 +1184,11 @@ void imprime_arquivo(FILE *SA, char *nome)
     {
         volta_pro_root(SA);
         cont += TAMANHO_METADADOS_ROOT;
+    }
+    else if (bloco_dir == -1)
+    {
+        fprintf(stderr, "%s não foi encontrado\n", nome);
+        return -1;
     }
 
     char nome_lido[255], c;
@@ -1196,7 +1201,7 @@ void imprime_arquivo(FILE *SA, char *nome)
 
         if (cont >= TAMANHO_BLOCO)
             if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
-                return;
+                return -1;
 
         //Aqui, nome_lido contém o nome errado e SA aponta para o primeiro caracter após \0
         while ((nome_lido[i] = fgetc(SA)) != '\0')
@@ -1206,14 +1211,14 @@ void imprime_arquivo(FILE *SA, char *nome)
             //Não sei se deve ser == ou >
             if (cont >= TAMANHO_BLOCO)
                 if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
-                    return;
+                    return -1;
         }
         if (nome_lido[0] == '\0')
-            return;
+            return -1;
         cont++;
         if (cont >= TAMANHO_BLOCO)
             if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
-                return;
+                return -1;
 
         tamanho_entrada = atoi(nome_lido);
         i = 0;
@@ -1223,7 +1228,7 @@ void imprime_arquivo(FILE *SA, char *nome)
             cont++;
             if (cont >= TAMANHO_BLOCO)
                 if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
-                    return;
+                    return -1;
         }
         cont++;
         i = 0;
@@ -1239,7 +1244,7 @@ void imprime_arquivo(FILE *SA, char *nome)
         cont++;
         if (cont >= TAMANHO_BLOCO)
             if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
-                return;
+                return -1;
     }
     nome_lido[i] = '\0';
     int bloco_entrada = atoi(nome_lido);
@@ -1254,6 +1259,7 @@ void imprime_arquivo(FILE *SA, char *nome)
         fseek(SA, bloco_entrada * TAMANHO_BLOCO, SEEK_SET);
     } while (bloco_entrada != -1);
     fprintf(stderr, "\n");
+    return 1;
 }
 
 void atualiza_tempos(FILE *SA, char *dir_pai)
@@ -1279,7 +1285,7 @@ void atualiza_tempos(FILE *SA, char *dir_pai)
     }
     else
     {
-        fprintf(stderr, "O diretório %s não foi encontrado\n", dir_pai);
+        fprintf(stderr, "%s não foi encontrado\n", dir_pai);
     }
 }
 
