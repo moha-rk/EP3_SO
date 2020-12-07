@@ -1,0 +1,3 @@
+mount fs.txt
+cp arquivos_teste/arquivo1mb.txt /arq.txt
+sai

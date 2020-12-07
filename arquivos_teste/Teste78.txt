@@ -1,0 +1,3 @@
+mount fs.txt
+rmdir /d1
+sai
