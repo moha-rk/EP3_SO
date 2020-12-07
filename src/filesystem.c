@@ -5,7 +5,6 @@
 #include <time.h>
 #include "../lib/filesystem.h"
 
-//Retorno da função a ser definido, podendo ser um ponteiro FILE
 FILE *mount(char *nome_arquivo)
 {
     FILE *f;
@@ -15,7 +14,6 @@ FILE *mount(char *nome_arquivo)
         /*Carregar FAT e bitmap na memória nas váriaveis correspondentes*/
         carrega_FAT(f);
         carrega_bitmap(f);
-        //fclose(f);
         return f;
     }
     /*Cria sistema de arquivos com esse nome*/
@@ -49,11 +47,10 @@ void cria_FAT(FILE *f)
     FAT[i] = -1;
     //Primeiro bloco pertence ao '/'
     FAT[i + 1] = -1;
-    //Depois vejo se preciso zerar o resto dos elementos
+
     for (i = i + 2; i < N_BLOCOS; i++)
         FAT[i] = 0;
 
-    //Devo escrever no arquivo já aqui?
     for (i = 0; i < N_BLOCOS; i++)
         fprintf(f, "%05d", FAT[i]);
     preenche_bloco_vazio(f, BLOCOS_FAT - 1, (N_BLOCOS * FAT_ENTRY) % TAMANHO_BLOCO);
@@ -69,7 +66,6 @@ void carrega_FAT(FILE *f)
         fgets(buf, FAT_ENTRY + 1, f);
         FAT[i] = atoi(buf);
     }
-    //for (int i = 0; i < 50; i++) printf("FAT[%d] = %d\n", i, FAT[i]);
 }
 
 //Recebe um arquivo contendo apenas FAT e escreve o bitmap nele, também o armazenando na memória
@@ -99,10 +95,9 @@ void carrega_bitmap(FILE *SA)
     {
         bitmap[i] = fgetc(SA);
     }
-    //for (int i = 0; i < 50; i++) printf("bitmap[%d] = %d\n", i, bitmap[i]);
 }
 
-//O root conterá os próprios metadados?
+//O root conterá os próprios metadados
 void cria_root(FILE *f)
 {
     fputc('/', f);
@@ -126,7 +121,6 @@ void volta_pro_root(FILE *f)
     fseek(f, TAMANHO_BLOCO * BLOCO_ROOT + TAMANHO_METADADOS_ROOT, SEEK_SET);
 }
 
-//SA = Sistema de arquivos
 //add_arquivo deve conferir se há tamanho suficiente para o arquivo, buscar o diretorio onde deve ser salvo o arquivo, salvar seus metadados nesse diretorio e então salvar o arquivo em um ou mais blocos
 //add_arquivo sempre partirá do root
 int add_arquivo(FILE *SA, char *nome_origem, char *nome_destino)
@@ -253,7 +247,7 @@ int add_arquivo_vazio(FILE *SA, char *nome, int tamanho)
     adiciona_metadados_arquivo(SA, dir, nome, tamanho, primeiro);
 
     aloca_bloco(SA, primeiro);
-    return 0; //Acho
+    return 0;
 }
 
 int busca_espaco_metadados(FILE *SA, int dir, int tam_metadados, int *primeiro, int segundo, int blocos_arquivo)
@@ -354,11 +348,6 @@ void nome_dir_pai(char *nome)
     strcpy(nome, aux);
 }
 
-//dir_atual deve ser chamado com "/" e bloco_dir com o bloco do root
-//Devo alimentar a função com um caminho contendo o nome do arquivo no final?
-//entradas serão do tipo "/tmp/d1/arquivo.txt" ou "/tmp/d1"?
-//Acho que vou fazer uma função que busca o penultimo diretorio. Nos exemplos acima, deve buscar d1 e tmp.
-
 //Esta função devolve o bloco do diretorio anterior à última entrada (arquivo.txt ou d1 no exemplo acima)
 //dir_atual deve ser chamado com "/" e bloco_dir com o bloco do root, e nome_atual é o q queremos buscar
 int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_dir)
@@ -393,7 +382,6 @@ int busca_diretorio_pai(FILE *SA, char *dir_atual, char *nome_atual, int bloco_d
         if (bloco_dir == -1)
         {
             fprintf(stderr, "%s não foi encontrado em %s\n", dir_aux, dir_atual);
-            //volta_pro_root(SA);
             return -1;
         }
         fseek(SA, TAMANHO_BLOCO * bloco_dir, SEEK_SET);
@@ -439,7 +427,6 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
         {
             i++;
             cont++;
-            //Não sei se deve ser == ou >
             if (cont >= TAMANHO_BLOCO)
                 if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
                     return -1;
@@ -470,7 +457,7 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
     fseek(SA, -tamanho_entrada + (strlen(nome_lido) + 1), SEEK_CUR);
     //*SA aponta para o tamanho (caso seja arquivo regular) ou para o primeiro tempo caso seja um diretorio
     //Depois adiciono mais infos para devolver, por enquanto devolverei apenas o diretorio FAT
-    if (info == 1) //Numero generico
+    if (info == GETFAT)
     {
         fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1) - FAT_ENTRY - 1, SEEK_CUR);
 
@@ -479,7 +466,7 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
         nome_lido[i] = '\0';
         return atoi(nome_lido); //FAT
     }
-    else if (info == 2) //Função que serve para posicionar SA no inicio do tempo de acesso (tempo2)
+    else if (info == SETPOSITIONTOTIME) //Função que serve para posicionar SA no inicio do tempo de acesso (tempo2)
     {
         fseek(SA, tamanho_entrada - (strlen(nome_lido) + 1) - (FAT_ENTRY + 1 + 2 * TAMANHO_TIME), SEEK_CUR);
         return 1;
@@ -488,7 +475,7 @@ int procura_nome_e_devolve_info(FILE *SA, char *nome, int info, int bloco_dir)
 
 void df(FILE *SA, int bloco_dir_atual, int *ndirs, int *narquivos, int primeira_chamada)
 {
-    //Primeiro, faremos uma busca em profundidade para encontrar o numeor de arquivos e diretorios (sem contar o root)
+    //Primeiro, faremos uma busca em profundidade para encontrar o numero de arquivos e diretorios (sem contar o root)
     int cont = 0, i = 0, tamanho_entrada;
 
     if (bloco_dir_atual == BLOCO_ROOT)
@@ -510,12 +497,10 @@ void df(FILE *SA, int bloco_dir_atual, int *ndirs, int *narquivos, int primeira_
         {
             i++;
             cont++;
-            //Não sei se deve ser == ou >
             if (cont >= TAMANHO_BLOCO)
                 if (!busca_continuacao_dir(SA, &bloco_dir_atual, &cont))
                     break;
         }
-        //fprintf(stderr, "nomelido=%s\n", nome_lido);
         if (nome_lido[0] == '\0' || cont >= TAMANHO_BLOCO)
             break;
         cont++;
@@ -1108,6 +1093,8 @@ void lista_itens_diretorio(FILE *SA, char *nome)
             fprintf(stderr, "%s/ ", nome_lido);
             int j;
             for (j = 0; j < 15 - strlen(nome_lido); j++) fprintf(stderr, " ");
+            fprintf(stderr, "--");
+            for (j = 0; j < 17; j++) fprintf(stderr, " ");
             fseek(SA, TAMANHO_TIME * 2, SEEK_CUR);
             cont += TAMANHO_TIME*2;
             if (cont >= TAMANHO_BLOCO)
@@ -1149,16 +1136,15 @@ int busca_continuacao_dir(FILE *SA, int *bloco_dir, int *cont)
     }
 }
 
-//Nome+tamanho(arquivos)+tempos+endereço
 //"tamanho = -1" se for diretorio. "tamanho = bytes" caso arquivo regular
 int calcula_tamanho_metadados(char *nome, int tamanho)
 {
     int tam_digitos = digitos(tamanho);
-    //30 é a soma dos tempos (acesso, modificação...), 5 é entrada da FAT e 1 é |
-    return strlen(nome) + 1 + 30 + tam_digitos + 5 + 1;
+    //1 é o \0,                                                      1 é o |
+    return strlen(nome) + 1 + 3*TAMANHO_TIME + tam_digitos + FAT_ENTRY + 1;
 }
 
-//Por enquanto, esta função irá manter o ponteiro SA na primeira posição vazia do bloco
+//Esta função conta o espaço restante no bloco n_bloco, e mantém o ponteiro SA na primeira posição vazia do bloco
 int espaco_restante_bloco(FILE *SA, int n_bloco)
 {
     int pos_anterior = ftell(SA), pos_atual;
@@ -1184,12 +1170,10 @@ int espaco_restante_bloco(FILE *SA, int n_bloco)
         return 1;
     if (ant <= 1)
     {
-        //fseek(SA, pos_anterior, SEEK_SET);
         return 0;
     }
     pos_atual = ftell(SA) - 2;
 
-    //fseek(SA, pos_anterior, SEEK_SET);
     fseek(SA, -2, SEEK_CUR);
 
     return (TAMANHO_BLOCO * (n_bloco + 1)) - pos_atual;
@@ -1208,8 +1192,8 @@ int espaco_restante_diretorio(FILE *SA, int *bloco_dir)
 
 //Adiciona entrada com metadados de um arquivo a um diretorio
 //bloco_dir = bloco do diretorio pai, nome = nome do arquivo, tamanho = -1 se diretorio, bloco_alocado = bloco alocado para o arquivo
-//Acho que farei com que sempre que essa função seja chamada, o diretorio ja tenha espaço para essa entrada
-//Da forma que está, SA já está posicionado no byte que quero escrever
+//Quando essa função é chamada, o diretorio ja tem espaço para essa entrada
+//SA já deve estar posicionado no byte que deve ser escrito
 void adiciona_metadados_arquivo(FILE *SA, int bloco_dir, char *nome, int tamanho, int bloco_alocado)
 {
     int tamanho_entrada = calcula_tamanho_metadados(nome, tamanho);
@@ -1291,7 +1275,6 @@ int imprime_arquivo(FILE *SA, char *nome)
         {
             i++;
             cont++;
-            //Não sei se deve ser == ou >
             if (cont >= TAMANHO_BLOCO)
                 if (!busca_continuacao_dir(SA, &bloco_dir, &cont))
                     return -1;
